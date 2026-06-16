@@ -3,60 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Miss App - Firebase</title>
-    <script>
-    (function () {
-        // Create an overlay container
-        var container = document.createElement('div');
-        container.style.position = 'fixed';
-        container.style.bottom = '0';
-        container.style.left = '0';
-        container.style.width = '100%';
-        container.style.height = '150px';
-        container.style.background = 'rgba(0, 0, 0, 0.9)';
-        container.style.color = '#00ff00';
-        container.style.fontFamily = 'monospace';
-        container.style.fontSize = '12px';
-        container.style.padding = '10px';
-        container.style.overflowY = 'scroll';
-        container.style.zIndex = '99999';
-        container.style.borderTop = '2px solid #0284c7';
-        container.innerHTML = '<strong>--- iPad Console Logs ---</strong><br>';
-        
-        document.documentElement.appendChild(container);
-
-        // Intercept standard console logs
-        var oldLog = console.log;
-        console.log = function (message) {
-            container.innerHTML += '👉 ' + (typeof message === 'object' ? JSON.stringify(message) : message) + '<br>';
-            container.scrollTop = container.scrollHeight;
-            oldLog.apply(console, arguments);
-        };
-
-        // Intercept standard errors
-        var oldError = console.error;
-        console.error = function (message) {
-            container.innerHTML += '<span style="color: #ff3333;">❌ ' + (typeof message === 'object' ? JSON.stringify(message) : message) + '</span><br>';
-            container.scrollTop = container.scrollHeight;
-            oldError.apply(console, arguments);
-        };
-
-        // Catch unhandled window errors
-        window.onerror = function (message, source, lineno, colno, error) {
-            console.error(message + ' (Line: ' + lineno + ')');
-            return false;
-        };
-    })();
-</script>
+    <title>Miss App - Cross-Platform</title>
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
             background: linear-gradient(135deg, #e0f2fe, #bae6fd);
             display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0;
+            overflow: hidden;
         }
         .app-container {
             background: white; padding: 30px; border-radius: 20px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; width: 320px;
+            position: relative; z-index: 10;
         }
         h1 { color: #0284c7; margin-bottom: 25px; }
         input {
@@ -71,20 +29,36 @@
         button:hover { background-color: #0369a1; }
         .hidden { display: none; }
         hr { border: 0; height: 1px; background: #e0f2fe; margin: 20px 0; }
+        
+        /* FALLBACK IN-APP NOTIFICATION CONTAINER */
+        #in-app-toast {
+            position: fixed; top: -100px; left: 50%; transform: translateX(-50%);
+            background: #0284c7; color: white; padding: 15px 25px; border-radius: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2); font-weight: bold; display: flex;
+            align-items: center; gap: 10px; transition: top 0.5s ease-in-out; z-index: 99999;
+        }
+        #in-app-toast.show { top: 20px; }
+        .badge-status { font-size: 11px; margin-top: 5px; color: #64748b; }
     </style>
 </head>
 <body>
 
+    <div id="in-app-toast">
+        <span id="toast-icon">🔔</span> <span id="toast-message">You have a new message!</span>
+    </div>
+
     <div class="app-container">
-        <h1>🔔 Miss App (FCM)</h1>
+        <h1>🔔 Miss App</h1>
         
         <div id="login-section">
             <input type="text" id="username" placeholder="Enter your name...">
             <button id="btn-login">Join App</button>
+            <div id="browser-status-label" class="badge-status">Checking compatibility...</div>
         </div>
 
         <div id="main-section" class="hidden">
             <p>Logged in as: <strong id="current-user"></strong></p>
+            <div id="connection-mode" style="font-size:12px; color:#0369a1; font-weight:bold;"></div>
             <hr>
             <h3>Send a thought:</h3>
             <input type="text" id="target-user" placeholder="Who do you miss?">
@@ -93,144 +67,181 @@
     </div>
 
     <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
-    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    const firebaseConfig = {
-        apiKey: "AIzaSyBYzm3FmCClZ4LBKHVknfK3qLxwyjIfzAA",
-        authDomain: "missapp-c099e.firebaseapp.com",
-        projectId: "missapp-c099e",
-        storageBucket: "missapp-c099e.firebasestorage.app",
-        messagingSenderId: "736804728072",
-        appId: "1:736804728072:web:f9dbab5560df3ab33590bd",
-        measurementId: "G-CFYP2LKMW9"
-    };
+        const firebaseConfig = {
+            apiKey: "AIzaSyBYzm3FmCClZ4LBKHVknfK3qLxwyjIfzAA",
+            authDomain: "missapp-c099e.firebaseapp.com",
+            projectId: "missapp-c099e",
+            storageBucket: "missapp-c099e.firebasestorage.app",
+            messagingSenderId: "736804728072",
+            appId: "1:736804728072:web:f9dbab5560df3ab33590bd",
+            measurementId: "G-CFYP2LKMW9"
+        };
 
-    const FIREBASE_VAPID_KEY = "BDNDXVUdDqeS20icXJewArG9m5wzTp6Pmrf9FXWjYekQJvs984pHx6DuXAYJTZI9mU0Q7oPD68ZpKIdDSTuZGoE";
+        const FIREBASE_VAPID_KEY = "BDNDXVUdDqeS20icXJewArG9m5wzTp6Pmrf9FXWjYekQJvs984pHx6DuXAYJTZI9mU0Q7oPD68ZpKIdDSTuZGoE";
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    let messaging = null; 
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        let messaging = null; 
 
-    const loginSection = document.getElementById('login-section');
-    const mainSection = document.getElementById('main-section');
-    const usernameInput = document.getElementById('username');
-    const targetInput = document.getElementById('target-user');
-    const currentUserLabel = document.getElementById('current-user');
+        const loginSection = document.getElementById('login-section');
+        const mainSection = document.getElementById('main-section');
+        const usernameInput = document.getElementById('username');
+        const targetInput = document.getElementById('target-user');
+        const currentUserLabel = document.getElementById('current-user');
+        const statusLabel = document.getElementById('browser-status-label');
+        const modeLabel = document.getElementById('connection-mode');
 
-    let currentUsername = '';
+        let currentUsername = '';
+        let isUsingFallbackMode = false;
 
-    async function initFCM(username) {
-        try {
-            console.log('Checking browser feature compatibility...');
-            const supported = await isSupported();
-            if (!supported) {
-                return alert('Web Push is unsupported on this browser. If on iOS/iPadOS, you must use Safari and "Add to Home Screen"!');
-            }
+        // Custom UI Toast trigger
+        function showInAppNotification(title, body) {
+            const toast = document.getElementById('in-app-toast');
+            document.getElementById('toast-message').innerText = `${title}: ${body}`;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 5000);
+        }
 
-            if (!messaging) messaging = getMessaging(app);
-
-            console.log('Automatically requesting notification permissions...');
-            const permission = await Notification.requestPermission();
-            if (permission !== 'granted') {
-                return alert('Notifications were blocked. Please enable them in your device settings to use this app!');
-            }
-
-            console.log('Registering service worker configuration...');
-            let registration;
+        async function initFCM(username) {
             try {
-                const rootPath = window.location.origin + window.location.pathname.split('/public/')[0];
-                const swAbsoluteUrl = `${rootPath}/firebase-messaging-sw.js`;
+                const pushSupported = await isSupported() && ('Notification' in window);
                 
-                registration = await navigator.serviceWorker.register(swAbsoluteUrl, { scope: '/' });
-                console.log('Service worker registered successfully!');
-            } catch (swError) {
-                console.error('Service Worker fallback triggered: ', swError.message);
-                registration = await navigator.serviceWorker.ready;
-            }
-            
-            console.log('Fetching registration token...');
-            const currentToken = await getToken(messaging, { 
-                vapidKey: FIREBASE_VAPID_KEY,
-                serviceWorkerRegistration: registration 
-            });
-            
-            if (currentToken) {
-                console.log('Saving profile to database...');
-                await setDoc(doc(db, "users", username.toLowerCase()), {
-                    username: username,
-                    token: currentToken
-                });
-
-                // Save username to local memory so they don't have to re-type it next time
-                localStorage.setItem('miss_app_username', username);
-
-                currentUsername = username;
-                currentUserLabel.innerText = username;
-                loginSection.classList.add('hidden');
-                mainSection.classList.remove('hidden');
-                console.log('Successfully active!');
-
-                onMessage(messaging, (payload) => {
-                    alert(`🔔 ${payload.notification.title}\n${payload.notification.body}`);
-                });
-            } else {
-                alert('No registration token available.');
-            }
-        } catch (err) {
-            console.error('Detailed Error: ' + err.message);
-        }
-    }
-
-    // Manual Send thought function
-    document.getElementById('btn-send').addEventListener('click', async () => {
-        const target = targetInput.value.trim();
-        if (!target) return alert('Enter a username');
-
-        try {
-            const userDoc = await getDoc(doc(db, "users", target.toLowerCase()));
-            if (userDoc.exists()) {
-                const targetToken = userDoc.data().token;
-                alert(`Found ${target}! Sending thought...`);
-                console.log(`Sending message to token: ${targetToken}`);
-                alert(`Sent to ${target}!`);
-            } else {
-                alert('User not found in database.');
-            }
-        } catch (error) {
-            console.error(error);
-            alert('Failed to send message.');
-        }
-    });
-
-    // Manual backup button fallback if they change names
-    document.getElementById('btn-login').addEventListener('click', () => {
-        const user = usernameInput.value.trim();
-        if (user) initFCM(user);
-    });
-
-    // --- AUTOMATIC RUN ON OPEN ---
-    window.addEventListener('DOMContentLoaded', () => {
-        // Check if browser already remembers who they are
-        let savedName = localStorage.getItem('miss_app_username');
-        
-        if (savedName) {
-            console.log(`Welcome back, ${savedName}. Connecting notification channel...`);
-            initFCM(savedName);
-        } else {
-            // Wait 1 second after visual UI renders, then smoothly ask for their identity
-            setTimeout(() => {
-                let promptedName = prompt("Welcome to Miss App! Please enter your name to link notifications:");
-                if (promptedName && promptedName.trim() !== "") {
-                    usernameInput.value = promptedName.trim();
-                    initFCM(promptedName.trim());
-                } else {
-                    alert("You can still manually log in using the inputs on screen.");
+                // FALLBACK MODE SWITCH: Run if browser blocks/lacks push service workers
+                if (!pushSupported || Notification.permission === 'denied') {
+                    console.log("Switching engine to real-time firestore fallback polling...");
+                    isUsingFallbackMode = true;
+                    setupFallbackInAppChannel(username);
+                    return;
                 }
-            }, 1000);
+
+                if (!messaging) messaging = getMessaging(app);
+                const permission = await Notification.requestPermission();
+                
+                if (permission !== 'granted') {
+                    isUsingFallbackMode = true;
+                    setupFallbackInAppChannel(username);
+                    return;
+                }
+
+                // Register native service worker paths
+                let registration;
+                try {
+                    const rootPath = window.location.origin + window.location.pathname.split('/public/')[0];
+                    registration = await navigator.serviceWorker.register(`${rootPath}/firebase-messaging-sw.js`, { scope: '/' });
+                } catch (e) {
+                    registration = await navigator.serviceWorker.ready;
+                }
+                
+                const currentToken = await getToken(messaging, { vapidKey: FIREBASE_VAPID_KEY, serviceWorkerRegistration: registration });
+                
+                if (currentToken) {
+                    await setDoc(doc(db, "users", username.toLowerCase()), {
+                        username: username,
+                        token: currentToken,
+                        mode: 'native-push',
+                        lastSeen: new Date().toISOString()
+                    });
+                    
+                    enterMainUI(username, "⚡ Native System Push Active");
+
+                    onMessage(messaging, (payload) => {
+                        showInAppNotification(payload.notification.title, payload.notification.body);
+                    });
+                }
+            } catch (err) {
+                console.error(err);
+                // Last ditch safety fallback integration
+                setupFallbackInAppChannel(username);
+            }
         }
-    });
-</script>
+
+        // 🌟 THE FALLBACK CHANNEL ENGINE
+        function setupFallbackInAppChannel(username) {
+            isUsingFallbackMode = true;
+            
+            // Register user to Firestore as a listener
+            setDoc(doc(db, "users", username.toLowerCase()), {
+                username: username,
+                token: 'polling-active',
+                mode: 'in-app-sync',
+                lastIncomingMessage: null,
+                lastSeen: new Date().toISOString()
+            });
+
+            enterMainUI(username, "🌐 App Live-Sync Active (No Setup Needed)");
+
+            // Create a real-time snapshot database trigger
+            onSnapshot(doc(db, "users", username.toLowerCase()), (snapshot) => {
+                const data = snapshot.data();
+                if (data && data.lastIncomingMessage) {
+                    const msg = data.lastIncomingMessage;
+                    
+                    // Trigger the visual UI notification alert
+                    showInAppNotification(msg.title, msg.body);
+                    
+                    // Clear message container out of database so it doesn't loop fire
+                    updateDoc(doc(db, "users", username.toLowerCase()), {
+                        lastIncomingMessage: null
+                    });
+                }
+            });
+        }
+
+        function enterMainUI(username, modeText) {
+            localStorage.setItem('miss_app_username', username);
+            currentUsername = username;
+            currentUserLabel.innerText = username;
+            modeLabel.innerText = modeText;
+            loginSection.classList.add('hidden');
+            mainSection.classList.remove('hidden');
+        }
+
+        // Send Core Logic
+        document.getElementById('btn-send').addEventListener('click', async () => {
+            const target = targetInput.value.trim();
+            if (!target) return alert('Enter a name');
+
+            try {
+                const userDoc = await getDoc(doc(db, "users", target.toLowerCase()));
+                if (userDoc.exists()) {
+                    const targetData = userDoc.data();
+                    
+                    // Send directly to their document if they are in Fallback/Live-Sync mode
+                    await updateDoc(doc(db, "users", target.toLowerCase()), {
+                        lastIncomingMessage: {
+                            title: "🚨 Miss You!",
+                            body: `${currentUsername} is thinking about you right now!`,
+                            sender: currentUsername
+                        }
+                    });
+
+                    alert(`Thought sent directly to ${target}!`);
+                } else {
+                    alert('User not found in database.');
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Delivery failed.');
+            }
+        });
+
+        document.getElementById('btn-login').addEventListener('click', () => {
+            const user = usernameInput.value.trim();
+            if (user) initFCM(user);
+        });
+
+        // Initialize status loops on load
+        window.addEventListener('load', async () => {
+            const pushSupported = await isSupported() && ('Notification' in window);
+            statusLabel.innerText = pushSupported ? "✓ System Push Ready" : "⚠️ Device restriction detected. Live-Sync Fallback enabled.";
+            
+            let savedName = localStorage.getItem('miss_app_username');
+            if (savedName) initFCM(savedName);
+        });
+    </script>
 </body>
 </html>
