@@ -66,7 +66,7 @@
             <hr>
             <h3>Send a thought:</h3>
             <input type="text" id="target-user" placeholder="Who do you want to message?">
-            <textarea id="custom-message" placeholder="Type your message... (Will auto-translate to their language!)"></textarea>
+            <textarea id="custom-message" placeholder="Type your message..."></textarea>
             <button id="btn-send">Send Thought 🚀</button>
         </div>
     </div>
@@ -104,24 +104,7 @@
         let currentUsername = '';
         let isUsingFallbackMode = false;
 
-        // Grabs the browser language code (e.g., 'en', 'es', 'fr', 'de')
         const userLanguage = (navigator.language || navigator.userLanguage).split('-')[0];
-
-        // Free client-side translation function using MyMemory API
-        async function translateText(text, targetLang) {
-            if (!text) return "";
-            try {
-                const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=auto|${targetLang}`);
-                const data = await response.json();
-                if(data && data.responseData) {
-                    return data.responseData.translatedText;
-                }
-                return text; 
-            } catch (err) {
-                console.error("Translation failed, falling back to original text:", err);
-                return text;
-            }
-        }
 
         function showInAppNotification(title, body) {
             const toast = document.getElementById('in-app-toast');
@@ -164,7 +147,7 @@
                         username: username,
                         token: currentToken,
                         mode: 'native-push',
-                        lang: userLanguage, // SAVING LANGUAGE
+                        lang: userLanguage,
                         lastSeen: new Date().toISOString()
                     });
                     
@@ -187,7 +170,7 @@
                 username: username,
                 token: 'polling-active',
                 mode: 'in-app-sync',
-                lang: userLanguage, // SAVING LANGUAGE
+                lang: userLanguage,
                 lastIncomingMessage: null,
                 lastSeen: new Date().toISOString()
             });
@@ -216,7 +199,7 @@
             mainSection.classList.remove('hidden');
         }
 
-        // Send Logic with Translation Integration
+        // Send Logic without Translation
         document.getElementById('btn-send').addEventListener('click', async () => {
             const target = targetInput.value.trim();
             const customText = messageInput.value.trim();
@@ -226,23 +209,8 @@
             try {
                 const userDoc = await getDoc(doc(db, "users", target.toLowerCase()));
                 if (userDoc.exists()) {
-                    const targetData = userDoc.data();
-                    // Get recipient language, default to English if missing
-                    const targetLang = targetData.lang || 'en'; 
-
                     let alertTitle = `📩 Message from ${currentUsername}`;
                     let alertBody = customText || `${currentUsername} is thinking about you right now!`;
-
-                    // If they speak a different language, translate it on the fly!
-                    if (targetLang !== userLanguage) {
-                        if (customText) {
-                            alertBody = await translateText(customText, targetLang);
-                        } else {
-                            // Automatically translate the default fallback phrase
-                            alertBody = await translateText(`${currentUsername} is thinking about you right now!`, targetLang);
-                        }
-                        alertTitle = await translateText(alertTitle, targetLang);
-                    }
                     
                     await updateDoc(doc(db, "users", target.toLowerCase()), {
                         lastIncomingMessage: {
@@ -252,7 +220,7 @@
                         }
                     });
 
-                    alert(`Translated and sent to ${target}!`);
+                    alert(`Sent to ${target}!`);
                     messageInput.value = ''; 
                 } else {
                     alert('User not found in database.');
