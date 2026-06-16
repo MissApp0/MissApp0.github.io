@@ -1,8 +1,18 @@
 const express = require('express');
 const admin = require('firebase-admin');
-const path = require('path');
-const serviceAccount = require('./serviceAccountKey.json');
 
+// 1. Check if the secret exists as an environment variable, otherwise fall back to local file
+let serviceAccount;
+
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  // Parse the raw JSON string stored in your environment/GitHub secret
+  serviceAccount = JSON.parse(process.env.FIREBASE_ADMIN_KEY);
+} else {
+  // Fallback for running locally on your computer
+  serviceAccount = require('./serviceAccountKey.json');
+}
+
+// 2. Initialize Firebase Admin
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
