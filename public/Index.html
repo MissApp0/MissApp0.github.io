@@ -17,11 +17,13 @@
             position: relative; z-index: 10;
         }
         h1 { color: #0284c7; margin-bottom: 25px; }
-        input {
+        input, textarea {
             width: 100%; padding: 12px; margin: 10px 0;
             border: 2px solid #e0f2fe; border-radius: 8px; box-sizing: border-box; font-size: 16px;
+            font-family: inherit;
         }
-        input:focus { border-color: #0284c7; outline: none; }
+        input:focus, textarea:focus { border-color: #0284c7; outline: none; }
+        textarea { resize: none; height: 80px; }
         button {
             width: 100%; background-color: #0284c7; color: white; border: none;
             padding: 12px; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold;
@@ -36,6 +38,7 @@
             background: #0284c7; color: white; padding: 15px 25px; border-radius: 30px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.2); font-weight: bold; display: flex;
             align-items: center; gap: 10px; transition: top 0.5s ease-in-out; z-index: 99999;
+            width: max-content; max-width: 90vw;
         }
         #in-app-toast.show { top: 20px; }
         .badge-status { font-size: 11px; margin-top: 5px; color: #64748b; }
@@ -50,7 +53,6 @@
     <div class="app-container">
         <h1>Miss App </h1>
         
-        
         <div id="login-section">
             <input type="text" id="username" placeholder="Enter your name...">
             <button id="btn-login">Join App</button>
@@ -63,8 +65,9 @@
             <div id="connection-mode" style="font-size:12px; color:#0369a1; font-weight:bold;"></div>
             <hr>
             <h3>Send a thought:</h3>
-            <input type="text" id="target-user" placeholder="Who do you miss?">
-            <button id="btn-send">Send "Miss You" 🚀</button>
+            <input type="text" id="target-user" placeholder="Who do you want to message?">
+            <textarea id="custom-message" placeholder="Type your message... (Will auto-translate to their language!)"></textarea>
+            <button id="btn-send">Send Thought 🚀</button>
         </div>
     </div>
 
@@ -93,6 +96,7 @@
         const mainSection = document.getElementById('main-section');
         const usernameInput = document.getElementById('username');
         const targetInput = document.getElementById('target-user');
+        const messageInput = document.getElementById('custom-message');
         const currentUserLabel = document.getElementById('current-user');
         const statusLabel = document.getElementById('browser-status-label');
         const modeLabel = document.getElementById('connection-mode');
@@ -100,7 +104,25 @@
         let currentUsername = '';
         let isUsingFallbackMode = false;
 
-        // Custom UI Toast trigger
+        // Grabs the browser language code (e.g., 'en', 'es', 'fr', 'de')
+        const userLanguage = (navigator.language || navigator.userLanguage).split('-')[0];
+
+        // Free client-side translation function using MyMemory API
+        async function translateText(text, targetLang) {
+            if (!text) return "";
+            try {
+                const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=auto|${targetLang}`);
+                const data = await response.json();
+                if(data && data.responseData) {
+                    return data.responseData.translatedText;
+                }
+                return text; 
+            } catch (err) {
+                console.error("Translation failed, falling back to original text:", err);
+                return text;
+            }
+        }
+
         function showInAppNotification(title, body) {
             const toast = document.getElementById('in-app-toast');
             document.getElementById('toast-message').innerText = `${title}: ${body}`;
@@ -112,9 +134,7 @@
             try {
                 const pushSupported = await isSupported() && ('Notification' in window);
                 
-                // FALLBACK MODE SWITCH: Run if browser blocks/lacks push service workers
                 if (!pushSupported || Notification.permission === 'denied') {
-                    console.log("Switching engine to real-time firestore fallback polling...");
                     isUsingFallbackMode = true;
                     setupFallbackInAppChannel(username);
                     return;
@@ -129,7 +149,6 @@
                     return;
                 }
 
-                // Register native service worker paths
                 let registration;
                 try {
                     const rootPath = window.location.origin + window.location.pathname.split('/public/')[0];
@@ -145,6 +164,7 @@
                         username: username,
                         token: currentToken,
                         mode: 'native-push',
+                        lang: userLanguage, // SAVING LANGUAGE
                         lastSeen: new Date().toISOString()
                     });
                     
@@ -156,36 +176,30 @@
                 }
             } catch (err) {
                 console.error(err);
-                // Last ditch safety fallback integration
                 setupFallbackInAppChannel(username);
             }
         }
 
-        // 🌟 THE FALLBACK CHANNEL ENGINE
         function setupFallbackInAppChannel(username) {
             isUsingFallbackMode = true;
             
-            // Register user to Firestore as a listener
             setDoc(doc(db, "users", username.toLowerCase()), {
                 username: username,
                 token: 'polling-active',
                 mode: 'in-app-sync',
+                lang: userLanguage, // SAVING LANGUAGE
                 lastIncomingMessage: null,
                 lastSeen: new Date().toISOString()
             });
 
             enterMainUI(username, "🌐 App Live-Sync Active (No Setup Needed)");
 
-            // Create a real-time snapshot database trigger
             onSnapshot(doc(db, "users", username.toLowerCase()), (snapshot) => {
                 const data = snapshot.data();
                 if (data && data.lastIncomingMessage) {
                     const msg = data.lastIncomingMessage;
-                    
-                    // Trigger the visual UI notification alert
                     showInAppNotification(msg.title, msg.body);
                     
-                    // Clear message container out of database so it doesn't loop fire
                     updateDoc(doc(db, "users", username.toLowerCase()), {
                         lastIncomingMessage: null
                     });
@@ -202,26 +216,44 @@
             mainSection.classList.remove('hidden');
         }
 
-        // Send Core Logic
+        // Send Logic with Translation Integration
         document.getElementById('btn-send').addEventListener('click', async () => {
             const target = targetInput.value.trim();
+            const customText = messageInput.value.trim();
+            
             if (!target) return alert('Enter a name');
 
             try {
                 const userDoc = await getDoc(doc(db, "users", target.toLowerCase()));
                 if (userDoc.exists()) {
                     const targetData = userDoc.data();
+                    // Get recipient language, default to English if missing
+                    const targetLang = targetData.lang || 'en'; 
+
+                    let alertTitle = `📩 Message from ${currentUsername}`;
+                    let alertBody = customText || `${currentUsername} is thinking about you right now!`;
+
+                    // If they speak a different language, translate it on the fly!
+                    if (targetLang !== userLanguage) {
+                        if (customText) {
+                            alertBody = await translateText(customText, targetLang);
+                        } else {
+                            // Automatically translate the default fallback phrase
+                            alertBody = await translateText(`${currentUsername} is thinking about you right now!`, targetLang);
+                        }
+                        alertTitle = await translateText(alertTitle, targetLang);
+                    }
                     
-                    // Send directly to their document if they are in Fallback/Live-Sync mode
                     await updateDoc(doc(db, "users", target.toLowerCase()), {
                         lastIncomingMessage: {
-                            title: "🚨 Miss You!",
-                            body: `${currentUsername} is thinking about you right now!`,
+                            title: alertTitle,
+                            body: alertBody,
                             sender: currentUsername
                         }
                     });
 
-                    alert(`Thought sent directly to ${target}!`);
+                    alert(`Translated and sent to ${target}!`);
+                    messageInput.value = ''; 
                 } else {
                     alert('User not found in database.');
                 }
@@ -236,7 +268,6 @@
             if (user) initFCM(user);
         });
 
-        // Initialize status loops on load
         window.addEventListener('load', async () => {
             const pushSupported = await isSupported() && ('Notification' in window);
             statusLabel.innerText = pushSupported ? "✓ System Push Ready" : "⚠️ Device restriction detected. Live-Sync Fallback enabled.";
