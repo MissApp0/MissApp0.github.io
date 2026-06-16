@@ -94,7 +94,6 @@
 
     <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    // ADDED: "isSupported" imported from firebase-messaging
     import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
     import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
@@ -112,8 +111,6 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    
-    // We handle messaging safely down in the function instead of top-level
     let messaging = null; 
 
     const loginSection = document.getElementById('login-section');
@@ -125,80 +122,74 @@
     let currentUsername = '';
 
     async function initFCM(username) {
-    try {
-        console.log('Checking browser feature compatibility...');
-        
-        const supported = await isSupported();
-        if (!supported) {
-            console.error('Push environment unsupported on this browser.');
-            return alert('This browser/device combination does not support Web Push Notifications. If you are on iOS/iPadOS, you must open this in native Safari and choose "Add to Home Screen"!');
-        }
-
-        if (!messaging) messaging = getMessaging(app);
-
-        console.log('Requesting notification permissions...');
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') return alert('Notifications blocked!');
-
-        // --- FIXED: CROSS-BROWSER MULTI-PATH PATH REGISTRATION ---
-        console.log('Registering service worker config safely...');
-        let registration;
-        
         try {
-            // This detects if your index.html is sitting inside a '/public/' subfolder 
-            // and forces the browser to look at the true root of your GitHub Pages site.
-            const swPath = window.location.pathname.includes('/public/') 
-                ? '../firebase-messaging-sw.js' 
-                : './firebase-messaging-sw.js';
+            console.log('Checking browser feature compatibility...');
+            const supported = await isSupported();
+            if (!supported) {
+                return alert('Web Push is unsupported on this browser. If on iOS/iPadOS, you must use Safari and "Add to Home Screen"!');
+            }
 
-            registration = await navigator.serviceWorker.register(swPath);
-            console.log('Service worker registered successfully!');
-        } catch (swError) {
-            console.error('Service Worker Registration failed, attempting fallback: ', swError);
-            // Fallback for browsers that allow notifications but block custom background workers
-            registration = await navigator.serviceWorker.ready;
-        }
-        
-        console.log('Fetching registration token...');
-        // Pass down whatever registration context we successfully gathered
-        const currentToken = await getToken(messaging, { 
-            vapidKey: FIREBASE_VAPID_KEY,
-            serviceWorkerRegistration: registration 
-        });
-        
-        if (currentToken) {
-            console.log('Token successfully generated! Saving to database...');
-            await setDoc(doc(db, "users", username.toLowerCase()), {
-                username: username,
-                token: currentToken
+            if (!messaging) messaging = getMessaging(app);
+
+            console.log('Automatically requesting notification permissions...');
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') {
+                return alert('Notifications were blocked. Please enable them in your device settings to use this app!');
+            }
+
+            console.log('Registering service worker configuration...');
+            let registration;
+            try {
+                const rootPath = window.location.origin + window.location.pathname.split('/public/')[0];
+                const swAbsoluteUrl = `${rootPath}/firebase-messaging-sw.js`;
+                
+                registration = await navigator.serviceWorker.register(swAbsoluteUrl, { scope: '/' });
+                console.log('Service worker registered successfully!');
+            } catch (swError) {
+                console.error('Service Worker fallback triggered: ', swError.message);
+                registration = await navigator.serviceWorker.ready;
+            }
+            
+            console.log('Fetching registration token...');
+            const currentToken = await getToken(messaging, { 
+                vapidKey: FIREBASE_VAPID_KEY,
+                serviceWorkerRegistration: registration 
             });
+            
+            if (currentToken) {
+                console.log('Saving profile to database...');
+                await setDoc(doc(db, "users", username.toLowerCase()), {
+                    username: username,
+                    token: currentToken
+                });
 
-            currentUsername = username;
-            currentUserLabel.innerText = username;
-            loginSection.classList.add('hidden');
-            mainSection.classList.remove('hidden');
-            console.log('Successfully logged in!');
+                // Save username to local memory so they don't have to re-type it next time
+                localStorage.setItem('miss_app_username', username);
 
-            onMessage(messaging, (payload) => {
-                alert(`🔔 ${payload.notification.title}\n${payload.notification.body}`);
-            });
+                currentUsername = username;
+                currentUserLabel.innerText = username;
+                loginSection.classList.add('hidden');
+                mainSection.classList.remove('hidden');
+                console.log('Successfully active!');
 
-        } else {
-            alert('No registration token available.');
+                onMessage(messaging, (payload) => {
+                    alert(`🔔 ${payload.notification.title}\n${payload.notification.body}`);
+                });
+            } else {
+                alert('No registration token available.');
+            }
+        } catch (err) {
+            console.error('Detailed Error: ' + err.message);
         }
-    } catch (err) {
-        console.error('Detailed Error: ' + err.message);
-        alert('Could not initialize push notifications. If you are using Incognito mode or an un-supported browser, try opening this site in a normal Safari or Chrome window.');
     }
-}
 
+    // Manual Send thought function
     document.getElementById('btn-send').addEventListener('click', async () => {
         const target = targetInput.value.trim();
         if (!target) return alert('Enter a username');
 
         try {
             const userDoc = await getDoc(doc(db, "users", target.toLowerCase()));
-            
             if (userDoc.exists()) {
                 const targetToken = userDoc.data().token;
                 alert(`Found ${target}! Sending thought...`);
@@ -213,9 +204,32 @@
         }
     });
 
+    // Manual backup button fallback if they change names
     document.getElementById('btn-login').addEventListener('click', () => {
         const user = usernameInput.value.trim();
         if (user) initFCM(user);
+    });
+
+    // --- AUTOMATIC RUN ON OPEN ---
+    window.addEventListener('DOMContentLoaded', () => {
+        // Check if browser already remembers who they are
+        let savedName = localStorage.getItem('miss_app_username');
+        
+        if (savedName) {
+            console.log(`Welcome back, ${savedName}. Connecting notification channel...`);
+            initFCM(savedName);
+        } else {
+            // Wait 1 second after visual UI renders, then smoothly ask for their identity
+            setTimeout(() => {
+                let promptedName = prompt("Welcome to Miss App! Please enter your name to link notifications:");
+                if (promptedName && promptedName.trim() !== "") {
+                    usernameInput.value = promptedName.trim();
+                    initFCM(promptedName.trim());
+                } else {
+                    alert("You can still manually log in using the inputs on screen.");
+                }
+            }, 1000);
+        }
     });
 </script>
 </body>
