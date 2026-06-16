@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Miss App - Firebase</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #e0f2fe, #bae6fd);
+            display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0;
+        }
+        .app-container {
+            background: white; padding: 30px; border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; width: 320px;
+        }
+        h1 { color: #0284c7; margin-bottom: 25px; }
+        input {
+            width: 100%; padding: 12px; margin: 10px 0;
+            border: 2px solid #e0f2fe; border-radius: 8px; box-sizing: border-box; font-size: 16px;
+        }
+        input:focus { border-color: #0284c7; outline: none; }
+        button {
+            width: 100%; background-color: #0284c7; color: white; border: none;
+            padding: 12px; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold;
+        }
+        button:hover { background-color: #0369a1; }
+        .hidden { display: none; }
+        hr { border: 0; height: 1px; background: #e0f2fe; margin: 20px 0; }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <h1>🔔 Miss App (FCM)</h1>
+        
+        <div id="login-section">
+            <input type="text" id="username" placeholder="Enter your name...">
+            <button id="btn-login">Join App</button>
+        </div>
+
+        <div id="main-section" class="hidden">
+            <p>Logged in as: <strong id="current-user"></strong></p>
+            <hr>
+            <h3>Send a thought:</h3>
+            <input type="text" id="target-user" placeholder="Who do you miss?">
+            <button id="btn-send">Send "Miss You" 🚀</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
+
+        // 1. YOUR FIREBASE CONFIG OBJECT
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // 2. YOUR FIREBASE DASHBOARD VAPID KEY
+        const FIREBASE_VAPID_KEY = "YOUR_FIREBASE_WEB_PUSH_CERTIFICATE_KEY";
+
+        const app = initializeApp(firebaseConfig);
+        const messaging = getMessaging(app);
+
+        const loginSection = document.getElementById('login-section');
+        const mainSection = document.getElementById('main-section');
+        const usernameInput = document.getElementById('username');
+        const targetInput = document.getElementById('target-user');
+        const currentUserLabel = document.getElementById('current-user');
+
+        let currentUsername = '';
+
+        async function initFCM(username) {
+            try {
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') return alert('Notifications blocked!');
+
+                // Get Firebase Device Token
+                const currentToken = await getToken(messaging, { vapidKey: FIREBASE_VAPID_KEY });
+                
+                if (currentToken) {
+                    // Send Token and User mapping to our backend Node server
+                    await fetch('/subscribe', {
+                        method: 'POST',
+                        body: JSON.stringify({ username, token: currentToken }),
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+
+                    currentUsername = username;
+                    currentUserLabel.innerText = username;
+                    loginSection.classList.add('hidden');
+                    mainSection.classList.remove('hidden');
+                } else {
+                    alert('No registration token available. Request permission to generate one.');
+                }
+            } catch (err) {
+                console.error('An error occurred while retrieving token. ', err);
+            }
+        }
+
+        // Handle foreground notifications (when app tab is actively focused)
+        onMessage(messaging, (payload) => {
+            alert(`${payload.notification.title}\n${payload.notification.body}`);
+        });
+
+        document.getElementById('btn-send').addEventListener('click', async () => {
+            const target = targetInput.value.trim();
+            if (!target) return alert('Enter a username');
+
+            const response = await fetch('/send-miss', {
+                method: 'POST',
+                body: JSON.stringify({ sender: currentUsername, target }),
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) alert(`Sent to ${target}!`);
+            else alert('User not found.');
+        });
+
+        document.getElementById('btn-login').addEventListener('click', () => {
+            const user = usernameInput.value.trim();
+            if (user) initFCM(user);
+        });
+    </script>
+</body>
+</html>
