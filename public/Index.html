@@ -125,58 +125,72 @@
     let currentUsername = '';
 
     async function initFCM(username) {
-        try {
-            console.log('Checking browser feature compatibility...');
-            
-            // FIXED: Guard rail checking if browser permits Service Worker structures
-            const supported = await isSupported();
-            if (!supported) {
-                console.error('Push environment un-supported on this browser.');
-                return alert('This browser/device combination does not support Web Push Notifications. If you are on an iPad/iPhone, you MUST open this site in native Safari and use "Add to Home Screen"!');
-            }
-
-            // Safe to initialize now that we passed verification
-            if (!messaging) messaging = getMessaging(app);
-
-            console.log('Requesting notification permissions...');
-            const permission = await Notification.requestPermission();
-            if (permission !== 'granted') return alert('Notifications blocked!');
-
-            console.log('Registering service worker configuration...');
-            const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
-            
-            console.log('Fetching registration token...');
-            const currentToken = await getToken(messaging, { 
-                vapidKey: FIREBASE_VAPID_KEY,
-                serviceWorkerRegistration: registration 
-            });
-            
-            if (currentToken) {
-                console.log('Token successfully generated! Saving to database...');
-                await setDoc(doc(db, "users", username.toLowerCase()), {
-                    username: username,
-                    token: currentToken
-                });
-
-                currentUsername = username;
-                currentUserLabel.innerText = username;
-                loginSection.classList.add('hidden');
-                mainSection.classList.remove('hidden');
-                console.log('Successfully logged in!');
-
-                // Setup foreground notification handler safely
-                onMessage(messaging, (payload) => {
-                    alert(`🔔 ${payload.notification.title}\n${payload.notification.body}`);
-                });
-
-            } else {
-                alert('No registration token available.');
-            }
-        } catch (err) {
-            console.error('FCM Error Trace: ' + (err.stack || err.message || err));
-            alert('Error running connection routine. Check the log screen at the bottom.');
+    try {
+        console.log('Checking browser feature compatibility...');
+        
+        const supported = await isSupported();
+        if (!supported) {
+            console.error('Push environment unsupported on this browser.');
+            return alert('This browser/device combination does not support Web Push Notifications. If you are on iOS/iPadOS, you must open this in native Safari and choose "Add to Home Screen"!');
         }
+
+        if (!messaging) messaging = getMessaging(app);
+
+        console.log('Requesting notification permissions...');
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') return alert('Notifications blocked!');
+
+        // --- FIXED: CROSS-BROWSER MULTI-PATH PATH REGISTRATION ---
+        console.log('Registering service worker config safely...');
+        let registration;
+        
+        try {
+            // This detects if your index.html is sitting inside a '/public/' subfolder 
+            // and forces the browser to look at the true root of your GitHub Pages site.
+            const swPath = window.location.pathname.includes('/public/') 
+                ? '../firebase-messaging-sw.js' 
+                : './firebase-messaging-sw.js';
+
+            registration = await navigator.serviceWorker.register(swPath);
+            console.log('Service worker registered successfully!');
+        } catch (swError) {
+            console.error('Service Worker Registration failed, attempting fallback: ', swError);
+            // Fallback for browsers that allow notifications but block custom background workers
+            registration = await navigator.serviceWorker.ready;
+        }
+        
+        console.log('Fetching registration token...');
+        // Pass down whatever registration context we successfully gathered
+        const currentToken = await getToken(messaging, { 
+            vapidKey: FIREBASE_VAPID_KEY,
+            serviceWorkerRegistration: registration 
+        });
+        
+        if (currentToken) {
+            console.log('Token successfully generated! Saving to database...');
+            await setDoc(doc(db, "users", username.toLowerCase()), {
+                username: username,
+                token: currentToken
+            });
+
+            currentUsername = username;
+            currentUserLabel.innerText = username;
+            loginSection.classList.add('hidden');
+            mainSection.classList.remove('hidden');
+            console.log('Successfully logged in!');
+
+            onMessage(messaging, (payload) => {
+                alert(`🔔 ${payload.notification.title}\n${payload.notification.body}`);
+            });
+
+        } else {
+            alert('No registration token available.');
+        }
+    } catch (err) {
+        console.error('Detailed Error: ' + err.message);
+        alert('Could not initialize push notifications. If you are using Incognito mode or an un-supported browser, try opening this site in a normal Safari or Chrome window.');
     }
+}
 
     document.getElementById('btn-send').addEventListener('click', async () => {
         const target = targetInput.value.trim();
