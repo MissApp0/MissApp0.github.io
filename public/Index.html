@@ -53,17 +53,18 @@
         import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
 
         // 1. YOUR FIREBASE CONFIG OBJECT
-        const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_AUTH_DOMAIN",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_STORAGE_BUCKET",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
-        };
+const firebaseConfig = {
+  apiKey: "AIzaSyBYzm3FmCClZ4LBKHVknfK3qLxwyjIfzAA",
+  authDomain: "missapp-c099e.firebaseapp.com",
+  projectId: "missapp-c099e",
+  storageBucket: "missapp-c099e.firebasestorage.app",
+  messagingSenderId: "736804728072",
+  appId: "1:736804728072:web:f9dbab5560df3ab33590bd",
+  measurementId: "G-CFYP2LKMW9"
+};
 
         // 2. YOUR FIREBASE DASHBOARD VAPID KEY
-        const FIREBASE_VAPID_KEY = "YOUR_FIREBASE_WEB_PUSH_CERTIFICATE_KEY";
+        const FIREBASE_VAPID_KEY = "BDNDXVUdDqeS20icXJewArG9m5wzTp6Pmrf9FXWjYekQJvs984pHx6DuXAYJTZI9mU0Q7oPD68ZpKIdDSTuZGoE";
 
         const app = initializeApp(firebaseConfig);
         const messaging = getMessaging(app);
