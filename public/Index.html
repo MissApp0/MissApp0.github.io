@@ -94,7 +94,8 @@
 
     <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
+    // ADDED: "isSupported" imported from firebase-messaging
+    import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
     import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -110,8 +111,10 @@
     const FIREBASE_VAPID_KEY = "BDNDXVUdDqeS20icXJewArG9m5wzTp6Pmrf9FXWjYekQJvs984pHx6DuXAYJTZI9mU0Q7oPD68ZpKIdDSTuZGoE";
 
     const app = initializeApp(firebaseConfig);
-    const messaging = getMessaging(app);
     const db = getFirestore(app);
+    
+    // We handle messaging safely down in the function instead of top-level
+    let messaging = null; 
 
     const loginSection = document.getElementById('login-section');
     const mainSection = document.getElementById('main-section');
@@ -123,16 +126,26 @@
 
     async function initFCM(username) {
         try {
+            console.log('Checking browser feature compatibility...');
+            
+            // FIXED: Guard rail checking if browser permits Service Worker structures
+            const supported = await isSupported();
+            if (!supported) {
+                console.error('Push environment un-supported on this browser.');
+                return alert('This browser/device combination does not support Web Push Notifications. If you are on an iPad/iPhone, you MUST open this site in native Safari and use "Add to Home Screen"!');
+            }
+
+            // Safe to initialize now that we passed verification
+            if (!messaging) messaging = getMessaging(app);
+
             console.log('Requesting notification permissions...');
             const permission = await Notification.requestPermission();
             if (permission !== 'granted') return alert('Notifications blocked!');
 
-            console.log('Registering service worker for iPad Safari...');
-            // FIXED: Explicitly register the service worker file required by Safari
+            console.log('Registering service worker configuration...');
             const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
             
             console.log('Fetching registration token...');
-            // FIXED: Pass registration object down so Safari links correctly
             const currentToken = await getToken(messaging, { 
                 vapidKey: FIREBASE_VAPID_KEY,
                 serviceWorkerRegistration: registration 
@@ -150,19 +163,20 @@
                 loginSection.classList.add('hidden');
                 mainSection.classList.remove('hidden');
                 console.log('Successfully logged in!');
+
+                // Setup foreground notification handler safely
+                onMessage(messaging, (payload) => {
+                    alert(`🔔 ${payload.notification.title}\n${payload.notification.body}`);
+                });
+
             } else {
                 alert('No registration token available.');
             }
         } catch (err) {
-            // FIXED: Directly send the precise object stack error text to your log overlay screen
-            console.error('FCM Error Trace: ' + err.stack || err.message || err);
-            alert('Error connecting to Firebase. Check the visual console at the bottom.');
+            console.error('FCM Error Trace: ' + (err.stack || err.message || err));
+            alert('Error running connection routine. Check the log screen at the bottom.');
         }
     }
-
-    onMessage(messaging, (payload) => {
-        alert(`🔔 ${payload.notification.title}\n${payload.notification.body}`);
-    });
 
     document.getElementById('btn-send').addEventListener('click', async () => {
         const target = targetInput.value.trim();
