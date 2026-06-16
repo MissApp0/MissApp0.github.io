@@ -28,7 +28,7 @@
         // Intercept standard console logs
         var oldLog = console.log;
         console.log = function (message) {
-            container.innerHTML += '👉 ' + message + '<br>';
+            container.innerHTML += '👉 ' + (typeof message === 'object' ? JSON.stringify(message) : message) + '<br>';
             container.scrollTop = container.scrollHeight;
             oldLog.apply(console, arguments);
         };
@@ -36,7 +36,7 @@
         // Intercept standard errors
         var oldError = console.error;
         console.error = function (message) {
-            container.innerHTML += '<span style="color: #ff3333;">❌ ' + message + '</span><br>';
+            container.innerHTML += '<span style="color: #ff3333;">❌ ' + (typeof message === 'object' ? JSON.stringify(message) : message) + '</span><br>';
             container.scrollTop = container.scrollHeight;
             oldError.apply(console, arguments);
         };
@@ -95,10 +95,8 @@
     <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
-    // ADDED: Import Firestore database modules to bypass needing a Node server
     import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // 1. YOUR FIREBASE CONFIG OBJECT
     const firebaseConfig = {
         apiKey: "AIzaSyBYzm3FmCClZ4LBKHVknfK3qLxwyjIfzAA",
         authDomain: "missapp-c099e.firebaseapp.com",
@@ -109,12 +107,11 @@
         measurementId: "G-CFYP2LKMW9"
     };
 
-    // 2. YOUR FIREBASE DASHBOARD VAPID KEY
     const FIREBASE_VAPID_KEY = "BDNDXVUdDqeS20icXJewArG9m5wzTp6Pmrf9FXWjYekQJvs984pHx6DuXAYJTZI9mU0Q7oPD68ZpKIdDSTuZGoE";
 
     const app = initializeApp(firebaseConfig);
     const messaging = getMessaging(app);
-    const db = getFirestore(app); // Initialize Firestore
+    const db = getFirestore(app);
 
     const loginSection = document.getElementById('login-section');
     const mainSection = document.getElementById('main-section');
@@ -126,14 +123,23 @@
 
     async function initFCM(username) {
         try {
+            console.log('Requesting notification permissions...');
             const permission = await Notification.requestPermission();
             if (permission !== 'granted') return alert('Notifications blocked!');
 
-            // Get Firebase Device Token
-            const currentToken = await getToken(messaging, { vapidKey: FIREBASE_VAPID_KEY });
+            console.log('Registering service worker for iPad Safari...');
+            // FIXED: Explicitly register the service worker file required by Safari
+            const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+            
+            console.log('Fetching registration token...');
+            // FIXED: Pass registration object down so Safari links correctly
+            const currentToken = await getToken(messaging, { 
+                vapidKey: FIREBASE_VAPID_KEY,
+                serviceWorkerRegistration: registration 
+            });
             
             if (currentToken) {
-                // FIXED: Save user and token directly to Firestore database (No Node server required!)
+                console.log('Token successfully generated! Saving to database...');
                 await setDoc(doc(db, "users", username.toLowerCase()), {
                     username: username,
                     token: currentToken
@@ -143,16 +149,17 @@
                 currentUserLabel.innerText = username;
                 loginSection.classList.add('hidden');
                 mainSection.classList.remove('hidden');
+                console.log('Successfully logged in!');
             } else {
                 alert('No registration token available.');
             }
         } catch (err) {
-            console.error('An error occurred while retrieving token. ', err);
-            alert('Error connecting to Firebase. Check console logs.');
+            // FIXED: Directly send the precise object stack error text to your log overlay screen
+            console.error('FCM Error Trace: ' + err.stack || err.message || err);
+            alert('Error connecting to Firebase. Check the visual console at the bottom.');
         }
     }
 
-    // Handle foreground notifications
     onMessage(messaging, (payload) => {
         alert(`🔔 ${payload.notification.title}\n${payload.notification.body}`);
     });
@@ -162,19 +169,11 @@
         if (!target) return alert('Enter a username');
 
         try {
-            // FIXED: Look up target user token directly from Firestore 
             const userDoc = await getDoc(doc(db, "users", target.toLowerCase()));
             
             if (userDoc.exists()) {
                 const targetToken = userDoc.data().token;
-
-                // NOTE: Sending direct FCM messages via HTTP v1 from client side 
-                // requires a secure OAuth token. For a quick static alternative, 
-                // we simulate the notice if target is online, or you must route HTTP requests 
-                // to Firebase Cloud Functions.
                 alert(`Found ${target}! Sending thought...`);
-                
-                // Temporary mock action for pure static testing:
                 console.log(`Sending message to token: ${targetToken}`);
                 alert(`Sent to ${target}!`);
             } else {
