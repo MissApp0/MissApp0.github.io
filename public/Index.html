@@ -4,6 +4,50 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Miss App - Firebase</title>
+    <script>
+    (function () {
+        // Create an overlay container
+        var container = document.createElement('div');
+        container.style.position = 'fixed';
+        container.style.bottom = '0';
+        container.style.left = '0';
+        container.style.width = '100%';
+        container.style.height = '150px';
+        container.style.background = 'rgba(0, 0, 0, 0.9)';
+        container.style.color = '#00ff00';
+        container.style.fontFamily = 'monospace';
+        container.style.fontSize = '12px';
+        container.style.padding = '10px';
+        container.style.overflowY = 'scroll';
+        container.style.zIndex = '99999';
+        container.style.borderTop = '2px solid #0284c7';
+        container.innerHTML = '<strong>--- iPad Console Logs ---</strong><br>';
+        
+        document.documentElement.appendChild(container);
+
+        // Intercept standard console logs
+        var oldLog = console.log;
+        console.log = function (message) {
+            container.innerHTML += '👉 ' + message + '<br>';
+            container.scrollTop = container.scrollHeight;
+            oldLog.apply(console, arguments);
+        };
+
+        // Intercept standard errors
+        var oldError = console.error;
+        console.error = function (message) {
+            container.innerHTML += '<span style="color: #ff3333;">❌ ' + message + '</span><br>';
+            container.scrollTop = container.scrollHeight;
+            oldError.apply(console, arguments);
+        };
+
+        // Catch unhandled window errors
+        window.onerror = function (message, source, lineno, colno, error) {
+            console.error(message + ' (Line: ' + lineno + ')');
+            return false;
+        };
+    })();
+</script>
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
