@@ -1,248 +1,333 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>App - Cross-Platform</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #e0f2fe, #bae6fd);
-            display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0;
-            overflow: hidden;
-        }
-        .app-container {
-            background: white; padding: 30px; border-radius: 20px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; width: 320px;
-            position: relative; z-index: 10;
-        }
-        h1 { color: #0284c7; margin-bottom: 25px; }
-        input, textarea {
-            width: 100%; padding: 12px; margin: 10px 0;
-            border: 2px solid #e0f2fe; border-radius: 8px; box-sizing: border-box; font-size: 16px;
-            font-family: inherit;
-        }
-        input:focus, textarea:focus { border-color: #0284c7; outline: none; }
-        textarea { resize: none; height: 80px; }
-        button {
-            width: 100%; background-color: #0284c7; color: white; border: none;
-            padding: 12px; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold;
-        }
-        button:hover { background-color: #0369a1; }
-        .hidden { display: none; }
-        hr { border: 0; height: 1px; background: #e0f2fe; margin: 20px 0; }
-        
-        /* FALLBACK IN-APP NOTIFICATION CONTAINER */
-        #in-app-toast {
-            position: fixed; top: -100px; left: 50%; transform: translateX(-50%);
-            background: #0284c7; color: white; padding: 15px 25px; border-radius: 30px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2); font-weight: bold; display: flex;
-            align-items: center; gap: 10px; transition: top 0.5s ease-in-out; z-index: 99999;
-            width: max-content; max-width: 90vw;
-        }
-        #in-app-toast.show { top: 20px; }
-        .badge-status { font-size: 11px; margin-top: 5px; color: #64748b; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0ea5e9">
+<title>MissApp — Advanced Chat</title>
+<style>
+:root{
+  --bg:#07111f;--panel:#0d1b2e;--panel2:#10233b;--text:#e8f1fb;--muted:#8fa6bd;
+  --accent:#38bdf8;--accent2:#0284c7;--border:rgba(148,163,184,.16);
+  --danger:#fb7185;--success:#34d399;--shadow:0 24px 70px rgba(0,0,0,.35)
+}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:Inter,Segoe UI,system-ui,sans-serif;color:var(--text);
+background:radial-gradient(circle at 20% 10%,#123b5a 0,transparent 34%),linear-gradient(135deg,#050b14,#0b1727 55%,#07111f);
+display:flex;align-items:center;justify-content:center;padding:20px}
+button,input,textarea{font:inherit}
+button{cursor:pointer}
+.app{width:min(1100px,100%);height:min(760px,calc(100vh - 40px));display:grid;grid-template-columns:290px 1fr;
+background:rgba(13,27,46,.9);border:1px solid var(--border);border-radius:24px;overflow:hidden;box-shadow:var(--shadow);backdrop-filter:blur(20px)}
+.sidebar{border-right:1px solid var(--border);padding:20px;display:flex;flex-direction:column;gap:16px;background:rgba(7,17,31,.48)}
+.brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:20px}
+.logo{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 10px 30px rgba(14,165,233,.3)}
+.profile{padding:14px;border:1px solid var(--border);border-radius:16px;background:rgba(255,255,255,.035)}
+.avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#164e63;font-weight:800}
+.profile-row{display:flex;align-items:center;gap:10px}
+.status{font-size:12px;color:var(--success);margin-top:3px}
+.nav{display:grid;gap:7px}
+.nav button,.ghost{border:1px solid transparent;background:transparent;color:var(--muted);text-align:left;padding:11px 12px;border-radius:11px}
+.nav button:hover,.nav button.active{background:rgba(56,189,248,.1);color:var(--text);border-color:var(--border)}
+.side-bottom{margin-top:auto;display:grid;gap:8px}
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{height:76px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:14px 22px}
+.title{font-size:18px;font-weight:800}.subtitle{font-size:12px;color:var(--muted);margin-top:3px}
+.actions{display:flex;gap:8px}.icon-btn{width:40px;height:40px;border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.04);color:var(--text)}
+.icon-btn:hover{background:rgba(255,255,255,.09)}
+.content{flex:1;overflow:auto;padding:24px}
+.view{display:none}.view.active{display:block}
+.hero{padding:26px;border:1px solid var(--border);border-radius:20px;background:linear-gradient(135deg,rgba(56,189,248,.09),rgba(255,255,255,.025))}
+.hero h1{margin:0 0 8px;font-size:30px}.hero p{color:var(--muted);line-height:1.6;margin:0}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+.card{border:1px solid var(--border);background:rgba(255,255,255,.035);border-radius:16px;padding:16px}
+.card .big{font-size:25px;font-weight:800}.muted{color:var(--muted);font-size:13px}
+.composer{margin-top:16px;border:1px solid var(--border);border-radius:20px;background:rgba(255,255,255,.035);padding:18px}
+label{display:block;font-size:12px;color:var(--muted);margin:0 0 7px}
+input,textarea{width:100%;background:#081524;color:var(--text);border:1px solid var(--border);outline:none;border-radius:12px;padding:12px}
+input:focus,textarea:focus{border-color:rgba(56,189,248,.7);box-shadow:0 0 0 3px rgba(56,189,248,.08)}
+textarea{min-height:120px;resize:vertical}
+.row{display:grid;grid-template-columns:1fr auto;gap:10px}.btn{border:0;border-radius:12px;padding:12px 18px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;font-weight:800}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.message-preview{margin-top:12px;padding:12px;border-radius:12px;background:#081524;border:1px dashed var(--border);font-size:13px;color:var(--muted)}
+.search{margin-bottom:14px}.history{display:grid;gap:9px}.item{padding:14px;border:1px solid var(--border);border-radius:15px;background:rgba(255,255,255,.035)}
+.item-top{display:flex;justify-content:space-between;gap:10px}.item b{font-size:14px}.item small{color:var(--muted)}
+.empty{padding:45px;text-align:center;color:var(--muted);border:1px dashed var(--border);border-radius:16px}
+.settings{display:grid;gap:12px;max-width:600px}.setting{display:flex;justify-content:space-between;align-items:center;padding:15px;border:1px solid var(--border);border-radius:15px}
+.toggle{width:48px;height:26px;border-radius:20px;border:0;background:#334155;position:relative}.toggle:after{content:"";position:absolute;width:20px;height:20px;top:3px;left:4px;background:white;border-radius:50%;transition:.2s}.toggle.on{background:var(--accent2)}.toggle.on:after{left:24px}
+#toast{position:fixed;top:18px;right:18px;max-width:min(420px,calc(100vw - 36px));padding:14px 17px;border-radius:15px;background:#10233b;border:1px solid var(--border);box-shadow:var(--shadow);transform:translateY(-130px);opacity:0;transition:.3s;z-index:50}
+#toast.show{transform:translateY(0);opacity:1}.toast-title{font-weight:800}.toast-body{font-size:13px;color:var(--muted);margin-top:3px}
+#login{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(circle at 50% 30%,#12405e,#050b14 60%);z-index:100;padding:20px}
+.login-card{width:min(430px,100%);padding:30px;border:1px solid var(--border);border-radius:24px;background:rgba(13,27,46,.92);box-shadow:var(--shadow)}
+.login-card h1{margin:0 0 8px}.login-card p{color:var(--muted);line-height:1.5}
+.login-card .btn{width:100%;margin-top:10px}.compat{font-size:12px;color:var(--muted);margin-top:12px;text-align:center}
+.hidden{display:none!important}
+.badge{display:inline-flex;padding:4px 8px;border-radius:999px;background:rgba(52,211,153,.1);color:var(--success);font-size:11px}
+.danger{color:var(--danger)!important}
+@media(max-width:780px){body{padding:0}.app{height:100vh;border-radius:0;grid-template-columns:1fr}.sidebar{display:none}.grid{grid-template-columns:1fr}.row{grid-template-columns:1fr}.content{padding:16px}.topbar{padding:12px 16px}}
+</style>
 </head>
 <body>
 
-    <div id="in-app-toast">
-        <span id="toast-icon">🔔</span> <span id="toast-message">You have a new message!</span>
+<div id="toast"><div class="toast-title" id="toastTitle">Notification</div><div class="toast-body" id="toastBody"></div></div>
+
+<div id="login">
+  <div class="login-card">
+    <div class="brand"><div class="logo">💬</div><div>MissApp <span class="badge">Advanced</span></div></div>
+    <h1 style="margin-top:22px">Welcome back</h1>
+    <p>Choose a display name to enter the real-time messaging app.</p>
+    <label for="username">Display name</label>
+    <input id="username" maxlength="32" autocomplete="nickname" placeholder="e.g. Alex">
+    <button class="btn" id="btnLogin">Enter App →</button>
+    <div class="compat" id="compat">Checking browser capabilities…</div>
+  </div>
+</div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="logo">💬</div>MissApp</div>
+    <div class="profile">
+      <div class="profile-row"><div class="avatar" id="avatar">?</div><div><b id="sideUser">Guest</b><div class="status">● Live</div></div></div>
     </div>
-
-    <div class="app-container">
-        <h1>Chat App </h1>
-        
-        <div id="login-section">
-            <input type="text" id="username" placeholder="Enter your name...">
-            <button id="btn-login">Join App</button>
-            <div id="browser-status-label" class="badge-status">Checking compatibility...</div>
-        </div>
-
-        <div id="main-section" class="hidden">
-            <p>Logged in as: <strong id="current-user"></strong></p>
-            <h2>Made by Denis/Dev1994eke in github</h2>
-            <div id="connection-mode" style="font-size:12px; color:#0369a1; font-weight:bold;"></div>
-            <hr>
-            <h3>Send a thought:</h3>
-            <input type="text" id="target-user" placeholder="Who do you want to message?">
-            <textarea id="custom-message" placeholder="Type your message... otherwise it will send as 'thingking of you now'"></textarea>
-            <button id="btn-send">Send Message 🚀</button>
-        </div>
+    <nav class="nav">
+      <button class="active" data-view="home">⌂ Dashboard</button>
+      <button data-view="send">✈ Send message</button>
+      <button data-view="history">◷ History</button>
+      <button data-view="settings">⚙ Settings</button>
+    </nav>
+    <div class="side-bottom">
+      <button class="ghost" id="logout">↪ Sign out</button>
+      <div class="muted">Made by Denis/Dev1994eke in GitHub</div>
     </div>
+  </aside>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  <main class="main">
+    <header class="topbar">
+      <div><div class="title" id="pageTitle">Dashboard</div><div class="subtitle" id="connection">Connecting…</div></div>
+      <div class="actions"><button class="icon-btn" id="soundBtn" title="Toggle sound">🔊</button><button class="icon-btn" id="themeBtn" title="Toggle theme">☀</button></div>
+    </header>
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyBYzm3FmCClZ4LBKHVknfK3qLxwyjIfzAA",
-            authDomain: "missapp-c099e.firebaseapp.com",
-            projectId: "missapp-c099e",
-            storageBucket: "missapp-c099e.firebasestorage.app",
-            messagingSenderId: "736804728072",
-            appId: "1:736804728072:web:f9dbab5560df3ab33590bd",
-            measurementId: "G-CFYP2LKMW9"
-        };
+    <section class="content">
+      <div class="view active" id="view-home">
+        <div class="hero">
+          <h1>Hey, <span id="helloUser">there</span> 👋</h1>
+          <p>Send a thought instantly. MissApp keeps the lightweight Firebase live-sync behavior from the original while adding a faster, cleaner interface, local history, search, notifications and keyboard shortcuts.</p>
+        </div>
+        <div class="grid">
+          <div class="card"><div class="big" id="sentCount">0</div><div class="muted">Messages sent</div></div>
+          <div class="card"><div class="big" id="receivedCount">0</div><div class="muted">Messages received</div></div>
+          <div class="card"><div class="big" id="modeStat">—</div><div class="muted">Connection mode</div></div>
+        </div>
+        <div class="composer">
+          <label>Quick send</label>
+          <div class="row"><input id="quickTarget" placeholder="Recipient username"><button class="btn" id="quickSend">Send 🚀</button></div>
+        </div>
+      </div>
 
-        const FIREBASE_VAPID_KEY = "BDNDXVUdDqeS20icXJewArG9m5wzTp6Pmrf9FXWjYekQJvs984pHx6DuXAYJTZI9mU0Q7oPD68ZpKIdDSTuZGoE";
+      <div class="view" id="view-send">
+        <div class="hero"><h1>Send a message</h1><p>Write a custom message or leave it empty for the default “thinking of you” message.</p></div>
+        <div class="composer">
+          <label for="target">Recipient</label><input id="target" maxlength="32" placeholder="Who do you want to message?">
+          <label for="message" style="margin-top:14px">Message</label><textarea id="message" maxlength="500" placeholder="Type your message…"></textarea>
+          <div class="message-preview" id="preview">Preview: <span>Default thinking-of-you message</span></div>
+          <button class="btn" id="sendBtn" style="margin-top:12px">Send Message 🚀</button>
+          <div class="muted" style="margin-top:8px">Tip: Ctrl/Cmd + Enter sends the message.</div>
+        </div>
+      </div>
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        let messaging = null; 
+      <div class="view" id="view-history">
+        <div class="hero"><h1>Message history</h1><p>History is stored locally in this browser. Incoming live notifications are also recorded here.</p></div>
+        <div class="composer"><input class="search" id="historySearch" placeholder="Search people or messages…"><div class="history" id="history"></div></div>
+      </div>
 
-        const loginSection = document.getElementById('login-section');
-        const mainSection = document.getElementById('main-section');
-        const usernameInput = document.getElementById('username');
-        const targetInput = document.getElementById('target-user');
-        const messageInput = document.getElementById('custom-message');
-        const currentUserLabel = document.getElementById('current-user');
-        const statusLabel = document.getElementById('browser-status-label');
-        const modeLabel = document.getElementById('connection-mode');
+      <div class="view" id="view-settings">
+        <div class="hero"><h1>Settings</h1><p>Personalize the app without changing the Firebase backend.</p></div>
+        <div class="settings" style="margin-top:14px">
+          <div class="setting"><div><b>Notification sound</b><div class="muted">Play a short sound for incoming messages</div></div><button class="toggle on" id="soundToggle"></button></div>
+          <div class="setting"><div><b>Desktop notifications</b><div class="muted">Request browser permission when supported</div></div><button class="toggle" id="notifyToggle"></button></div>
+          <div class="setting"><div><b>Clear local history</b><div class="muted">Deletes this browser's saved message history</div></div><button class="ghost danger" id="clearHistory">Clear</button></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
 
-        let currentUsername = '';
-        let isUsingFallbackMode = false;
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        const userLanguage = (navigator.language || navigator.userLanguage).split('-')[0];
+const firebaseConfig = {
+  apiKey:"AIzaSyBYzm3FmCClZ4LBKHVknfK3qLxwyjIfzAA",
+  authDomain:"missapp-c099e.firebaseapp.com",
+  projectId:"missapp-c099e",
+  storageBucket:"missapp-c099e.firebasestorage.app",
+  messagingSenderId:"736804728072",
+  appId:"1:736804728072:web:f9dbab5560df3ab33590bd",
+  measurementId:"G-CFYP2LKMW9"
+};
+const VAPID="BDNDXVUdDqeS20icXJewArG9m5wzTp6Pmrf9FXWjYekQJvs984pHx6DuXAYJTZI9mU0Q7oPD68pZKIdDSTuZGoE";
 
-        function showInAppNotification(title, body) {
-            const toast = document.getElementById('in-app-toast');
-            document.getElementById('toast-message').innerText = `${title}: ${body}`;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 5000);
-        }
+const app=initializeApp(firebaseConfig), db=getFirestore(app);
+let messaging=null, currentUsername="", unsubscribe=null;
+let fallback=false;
+let soundEnabled=JSON.parse(localStorage.getItem("miss_sound") ?? "true");
+let notifyEnabled=JSON.parse(localStorage.getItem("miss_notify") ?? "false");
+let history=JSON.parse(localStorage.getItem("miss_history") ?? "[]");
 
-        async function initFCM(username) {
-            try {
-                const pushSupported = await isSupported() && ('Notification' in window);
-                
-                if (!pushSupported || Notification.permission === 'denied') {
-                    isUsingFallbackMode = true;
-                    setupFallbackInAppChannel(username);
-                    return;
-                }
+const $=id=>document.getElementById(id);
+const els={login:$("login"),user:$("username"),compat:$("compat"),sideUser:$("sideUser"),hello:$("helloUser"),
+avatar:$("avatar"),connection:$("connection"),modeStat:$("modeStat"),sent:$("sentCount"),received:$("receivedCount"),
+target:$("target"),message:$("message"),preview:$("preview"),history:$("history"),search:$("historySearch"),
+soundToggle:$("soundToggle"),notifyToggle:$("notifyToggle")};
 
-                if (!messaging) messaging = getMessaging(app);
-                const permission = await Notification.requestPermission();
-                
-                if (permission !== 'granted') {
-                    isUsingFallbackMode = true;
-                    setupFallbackInAppChannel(username);
-                    return;
-                }
+function toast(title,body){
+  $("toastTitle").textContent=title;$("toastBody").textContent=body;
+  $("toast").classList.add("show");clearTimeout(toast.t);
+  toast.t=setTimeout(()=>$("toast").classList.remove("show"),4500);
+}
+function saveHistory(){localStorage.setItem("miss_history",JSON.stringify(history.slice(0,100)));renderHistory();updateStats()}
+function addHistory(type,other,text){
+  history.unshift({type,other,text,time:Date.now()});saveHistory();
+}
+function updateStats(){
+  els.sent.textContent=history.filter(x=>x.type==="sent").length;
+  els.received.textContent=history.filter(x=>x.type==="received").length;
+}
+function renderHistory(){
+  const q=els.search.value.trim().toLowerCase();
+  const rows=history.filter(x=>!q || `${x.other} ${x.text}`.toLowerCase().includes(q));
+  els.history.innerHTML=rows.length?rows.map(x=>`
+    <div class="item"><div class="item-top"><b>${escapeHtml(x.type==="sent"?"To ":"From ")}${escapeHtml(x.other)}</b><small>${new Date(x.time).toLocaleString()}</small></div>
+    <div style="margin-top:7px">${escapeHtml(x.text)}</div></div>`).join("")
+    : `<div class="empty">No messages found.</div>`;
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+function beep(){
+  if(!soundEnabled)return;
+  try{
+    const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
+    const c=new C(),o=c.createOscillator(),g=c.createGain();o.frequency.value=740;
+    g.gain.setValueAtTime(.0001,c.currentTime);g.gain.exponentialRampToValueAtTime(.12,c.currentTime+.02);
+    g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+.18);o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.2);
+  }catch{}
+}
+async function desktopNotify(title,body){
+  if(!notifyEnabled || !("Notification" in window))return;
+  if(Notification.permission==="granted")new Notification(title,{body});
+}
+function enterUI(name,mode){
+  currentUsername=name;localStorage.setItem("miss_app_username",name);
+  els.sideUser.textContent=name;els.hello.textContent=name;els.avatar.textContent=name[0]?.toUpperCase()||"?";
+  els.connection.textContent=mode;els.modeStat.textContent=mode.includes("Native")?"Push":"Live";
+  els.login.classList.add("hidden");updateStats();renderHistory();
+}
+function setMode(text){els.connection.textContent=text;els.modeStat.textContent=text.includes("Native")?"Push":"Live"}
 
-                let registration;
-                try {
-                    const rootPath = window.location.origin + window.location.pathname.split('/public/')[0];
-                    registration = await navigator.serviceWorker.register(`${rootPath}/firebase-messaging-sw.js`, { scope: '/' });
-                } catch (e) {
-                    registration = await navigator.serviceWorker.ready;
-                }
-                
-                const currentToken = await getToken(messaging, { vapidKey: FIREBASE_VAPID_KEY, serviceWorkerRegistration: registration });
-                
-                if (currentToken) {
-                    await setDoc(doc(db, "users", username.toLowerCase()), {
-                        username: username,
-                        token: currentToken,
-                        mode: 'native-push',
-                        lang: userLanguage,
-                        lastSeen: new Date().toISOString()
-                    });
-                    
-                    enterMainUI(username, "⚡ Native System Push Active");
+async function setupFallback(name){
+  fallback=true;setMode("🌐 Live-Sync active");
+  await setDoc(doc(db,"users",name.toLowerCase()),{
+    username:name,token:"polling-active",mode:"in-app-sync",lang:(navigator.language||"en").split("-")[0],
+    lastIncomingMessage:null,lastSeen:new Date().toISOString()
+  },{merge:true});
+  enterUI(name,"🌐 App Live-Sync Active");
+  if(unsubscribe)unsubscribe();
+  unsubscribe=onSnapshot(doc(db,"users",name.toLowerCase()),async snap=>{
+    const data=snap.data();if(!data?.lastIncomingMessage)return;
+    const msg=data.lastIncomingMessage;
+    if(msg.sender===currentUsername)return;
+    const text=msg.body||"New message";
+    addHistory("received",msg.sender||"Unknown",text);
+    toast(msg.title||`Message from ${msg.sender}`,text);beep();desktopNotify(msg.title||"New message",text);
+    try{await updateDoc(doc(db,"users",name.toLowerCase()),{lastIncomingMessage:null})}catch(e){console.warn(e)}
+  });
+}
+async function initFCM(name){
+  try{
+    const supported=await isSupported() && ("Notification" in window);
+    if(!supported||Notification.permission==="denied")return setupFallback(name);
+    if(!messaging)messaging=getMessaging(app);
+    const permission=await Notification.requestPermission();
+    if(permission!=="granted")return setupFallback(name);
+    let registration;
+    try{
+      registration=await navigator.serviceWorker.register("./firebase-messaging-sw.js",{scope:"./"});
+    }catch{registration=await navigator.serviceWorker.ready}
+    const token=await getToken(messaging,{vapidKey:VAPID,serviceWorkerRegistration:registration});
+    if(!token)return setupFallback(name);
+    fallback=false;
+    await setDoc(doc(db,"users",name.toLowerCase()),{
+      username:name,token,mode:"native-push",lang:(navigator.language||"en").split("-")[0],
+      lastSeen:new Date().toISOString()
+    },{merge:true});
+    enterUI(name,"⚡ Native System Push Active");
+    onMessage(messaging,payload=>{
+      const title=payload?.notification?.title||"New message";
+      const body=payload?.notification?.body||"You received a new message.";
+      addHistory("received",payload?.data?.sender||"Someone",body);toast(title,body);beep();
+    });
+  }catch(e){console.warn("FCM unavailable",e);await setupFallback(name)}
+}
 
-                    onMessage(messaging, (payload) => {
-                        showInAppNotification(payload.notification.title, payload.notification.body);
-                    });
-                }
-            } catch (err) {
-                console.error(err);
-                setupFallbackInAppChannel(username);
-            }
-        }
+async function sendMessage(target,text){
+  target=target.trim();text=text.trim();
+  if(!target){toast("Missing recipient","Enter a username first.");return}
+  if(target.toLowerCase()===currentUsername.toLowerCase()){toast("Not sent","Choose another user.");return}
+  $("sendBtn").disabled=true;$("quickSend").disabled=true;
+  try{
+    const ref=doc(db,"users",target.toLowerCase()), snap=await getDoc(ref);
+    if(!snap.exists()){toast("User not found",`No active user named ${target}.`);return}
+    const body=text||`${currentUsername} is thinking about you right now!`;
+    await updateDoc(ref,{lastIncomingMessage:{
+      title:`📩 Message from ${currentUsername}`,body,sender:currentUsername,createdAt:new Date().toISOString()
+    }});
+    addHistory("sent",target,body);toast("Message sent",`Delivered to ${target}.`);
+    els.message.value="";els.quickTarget.value="";els.target.value="";updatePreview();
+  }catch(e){console.error(e);toast("Delivery failed",e?.message||"Could not send the message.")}
+  finally{$("sendBtn").disabled=false;$("quickSend").disabled=false}
+}
+function updatePreview(){
+  const text=els.message.value.trim()||"Default thinking-of-you message";
+  els.preview.innerHTML=`Preview: <span>${escapeHtml(text)}</span>`;
+}
 
-        function setupFallbackInAppChannel(username) {
-            isUsingFallbackMode = true;
-            
-            setDoc(doc(db, "users", username.toLowerCase()), {
-                username: username,
-                token: 'polling-active',
-                mode: 'in-app-sync',
-                lang: userLanguage,
-                lastIncomingMessage: null,
-                lastSeen: new Date().toISOString()
-            });
+document.querySelectorAll(".nav button").forEach(btn=>btn.addEventListener("click",()=>{
+  document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));btn.classList.add("active");
+  document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
+  const view=btn.dataset.view;$(`view-${view}`).classList.add("active");
+  $("pageTitle").textContent={home:"Dashboard",send:"Send message",history:"History",settings:"Settings"}[view];
+}));
+$("btnLogin").addEventListener("click",()=>{const n=els.user.value.trim();if(n)initFCM(n)});
+els.user.addEventListener("keydown",e=>{if(e.key==="Enter")$("btnLogin").click()});
+$("sendBtn").addEventListener("click",()=>sendMessage(els.target.value,els.message.value));
+$("quickSend").addEventListener("click",()=>sendMessage($("quickTarget").value,""));
+els.message.addEventListener("input",updatePreview);
+els.message.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key==="Enter")$("sendBtn").click()});
+els.search.addEventListener("input",renderHistory);
 
-            enterMainUI(username, "🌐 App Live-Sync Active (No Setup Needed)");
+function syncToggles(){
+  els.soundToggle.classList.toggle("on",soundEnabled);els.notifyToggle.classList.toggle("on",notifyEnabled);
+}
+$("soundToggle").addEventListener("click",()=>{soundEnabled=!soundEnabled;localStorage.setItem("miss_sound",soundEnabled);syncToggles()});
+$("soundBtn").addEventListener("click",()=>{$("soundToggle").click();toast("Sound",soundEnabled?"Enabled":"Disabled")});
+$("notifyToggle").addEventListener("click",async()=>{
+  if(!("Notification" in window)){toast("Unsupported","This browser does not expose desktop notifications.");return}
+  const p=await Notification.requestPermission();notifyEnabled=p==="granted";localStorage.setItem("miss_notify",notifyEnabled);syncToggles();
+});
+$("themeBtn").addEventListener("click",()=>{
+  const light=document.body.dataset.theme!=="light";document.body.dataset.theme=light?"light":"dark";
+  if(light){document.documentElement.style.setProperty("--bg","#eef7fc");document.documentElement.style.setProperty("--panel","#fff");document.documentElement.style.setProperty("--panel2","#f1f7fb");document.documentElement.style.setProperty("--text","#0f172a");document.documentElement.style.setProperty("--muted","#64748b");document.documentElement.style.setProperty("--border","rgba(15,23,42,.12)");document.body.style.background="linear-gradient(135deg,#e0f2fe,#f8fafc)"}else location.reload();
+});
+$("clearHistory").addEventListener("click",()=>{if(confirm("Clear all local message history?")){history=[];saveHistory()}});
+$("logout").addEventListener("click",()=>{localStorage.removeItem("miss_app_username");location.reload()});
 
-            onSnapshot(doc(db, "users", username.toLowerCase()), (snapshot) => {
-                const data = snapshot.data();
-                if (data && data.lastIncomingMessage) {
-                    const msg = data.lastIncomingMessage;
-                    showInAppNotification(msg.title, msg.body);
-                    
-                    updateDoc(doc(db, "users", username.toLowerCase()), {
-                        lastIncomingMessage: null
-                    });
-                }
-            });
-        }
-
-        function enterMainUI(username, modeText) {
-            localStorage.setItem('miss_app_username', username);
-            currentUsername = username;
-            currentUserLabel.innerText = username;
-            modeLabel.innerText = modeText;
-            loginSection.classList.add('hidden');
-            mainSection.classList.remove('hidden');
-        }
-
-        // Send Logic without Translation
-        document.getElementById('btn-send').addEventListener('click', async () => {
-            const target = targetInput.value.trim();
-            const customText = messageInput.value.trim();
-            
-            if (!target) return alert('Enter a name');
-
-            try {
-                const userDoc = await getDoc(doc(db, "users", target.toLowerCase()));
-                if (userDoc.exists()) {
-                    let alertTitle = `📩 Message from ${currentUsername}`;
-                    let alertBody = customText || `${currentUsername} is thinking about you right now!`;
-                    
-                    await updateDoc(doc(db, "users", target.toLowerCase()), {
-                        lastIncomingMessage: {
-                            title: alertTitle,
-                            body: alertBody,
-                            sender: currentUsername
-                        }
-                    });
-
-                    alert(`Sent to ${target}!`);
-                    messageInput.value = ''; 
-                } else {
-                    alert('User not found in database.');
-                }
-            } catch (error) {
-                console.error(error);
-                alert('Delivery failed.');
-            }
-        });
-
-        document.getElementById('btn-login').addEventListener('click', () => {
-            const user = usernameInput.value.trim();
-            if (user) initFCM(user);
-        });
-
-        window.addEventListener('load', async () => {
-            const pushSupported = await isSupported() && ('Notification' in window);
-            statusLabel.innerText = pushSupported ? "✓ System Push Ready" : "⚠️ Device restriction detected. Live-Sync Fallback enabled.";
-            
-            let savedName = localStorage.getItem('miss_app_username');
-            if (savedName) initFCM(savedName);
-        });
-    </script>
+(async()=>{
+  const supported=await isSupported().catch(()=>false);
+  els.compat.textContent=supported&&("Notification" in window)?"✓ Push notifications available":"⚠ Live-sync fallback available";
+  syncToggles();updatePreview();renderHistory();
+  const saved=localStorage.getItem("miss_app_username");
+  if(saved)initFCM(saved);
+})();
+</script>
 </body>
 </html>
