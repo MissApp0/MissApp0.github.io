@@ -4,7 +4,7 @@ A polished, static GitHub Pages real-time messenger backed by **Firebase Authent
 
 ## Architecture and security
 
-- **Identity:** Firebase Email/Password Authentication creates a real UID. MissApp waits for the new account token before reserving the one-time visible username in `users/{username}`; every protected Firestore operation requires that authenticated UID.
+- **Identity:** Firebase Email/Password Authentication creates a real UID. A one-time visible username is reserved in `users/{username}` and bound to that UID.
 - **Chat data:** `conversations/{sorted_username_pair}`, its `messages` subcollection, and its `typing` subcollection are synchronized with Firestore listeners.
 - **Notifications:** the browser obtains an FCM registration token only after the user explicitly enables notifications. A Firestore-triggered Cloud Function sends *data-only* FCM messages. The service worker renders the notification, preventing browser/Firebase duplicate notification behavior.
 - **No secrets:** the Firebase web config and VAPID public key are intentionally public. Admin credentials are never committed: Cloud Functions use the deployment environment’s default service account.
@@ -52,7 +52,7 @@ conversations/{conversationId}/messages/{messageId}
 conversations/{conversationId}/typing/{username}
 ```
 
-User profiles include `uid`, visible `username`, normalized `key`, presence (`online`, `lastSeen`), language, creation time, notification preference, and (after opt-in) FCM token. Conversations contain participant username keys and Auth UIDs for access control. Messages contain sender/receiver identifiers and display names, text, server timestamp, and read state. The conversation-list query deliberately filters by `participantUids` (the authenticated identity field) so Firestore can prove the participant-only read rule, then orders the small, limited result set in the client. That avoids a composite-index dependency for the primary conversation view.
+User profiles include `uid`, visible `username`, normalized `key`, presence (`online`, `lastSeen`), language, creation time, notification preference, and (after opt-in) FCM token. Conversations contain participant username keys and Auth UIDs for access control. Messages contain sender/receiver identifiers and display names, text, server timestamp, and read state.
 
 ## Presence and notifications
 
@@ -65,7 +65,6 @@ If notification permission is denied, messages still arrive immediately through 
 - Confirm the GitHub Pages origin is allowed in Firebase Cloud Messaging settings.
 - Re-enable notifications from the bell button to refresh a token.
 - Review Firebase Functions logs with `firebase functions:log`.
-- If the app reports **Access was denied**, deploy the repository rules and indexes with `firebase deploy --only firestore:rules,firestore:indexes`, then sign out and sign in again. A new conversation is created before its subcollection listeners attach, so no-message conversations receive participant permissions immediately.
 - Invalid/expired registration tokens are automatically removed by the function.
 
 ## Local static preview (optional)
