@@ -65,7 +65,6 @@ If notification permission is denied, messages still arrive immediately through 
 - Confirm the GitHub Pages origin is allowed in Firebase Cloud Messaging settings.
 - Re-enable notifications from the bell button to refresh a token.
 - Review Firebase Functions logs with `firebase functions:log`.
-- If the app reports **Access was denied**, deploy the repository rules and indexes with `firebase deploy --only firestore:rules,firestore:indexes`, then sign out and sign in again. A new conversation is created before its subcollection listeners attach, so no-message conversations receive participant permissions immediately.
 - Invalid/expired registration tokens are automatically removed by the function.
 
 ## Local static preview (optional)
