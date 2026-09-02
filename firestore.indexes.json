@@ -1,0 +1,6 @@
+{
+  "indexes": [
+    {"collectionGroup":"messages","queryScope":"COLLECTION","fields":[{"fieldPath":"receiver","order":"ASCENDING"},{"fieldPath":"read","order":"ASCENDING"}]}
+  ],
+  "fieldOverrides": []
+}
