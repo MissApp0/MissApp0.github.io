@@ -1,4 +1,5 @@
 
+ 
 <!doctype html>
 <html lang="en">
 <head>
@@ -1822,170 +1823,200 @@
     /* LISTENERS */
 
     function clearListeners() {
-
       state.unsubs
         .splice(0)
-        .forEach(
-          fn => fn()
-        );
-
+        .forEach(fn => {
+          try {
+            fn();
+          } catch (e) {
+            console.warn(
+              "Listener cleanup failed:",
+              e
+            );
+          }
+        });
     }
 
 
     /* CONVERSATIONS */
 
-    function listenConversations() {
+    function renderConversationList(docs) {
+      const list = $("conversation-list");
+      list.textContent = "";
 
-      const q =
-        query(
-          collection(db,"conversations"),
-          where(
-            "participantKeys",
-            "array-contains",
-            state.me.key
-          ),
-          orderBy(
-            "updatedAt",
-            "desc"
-          ),
-          limit(50)
-        );
+      if (!docs.length) {
+        list.innerHTML = `
+          <div class="empty-small">
+            No messages yet.
+            Find someone above to start one.
+          </div>
+        `;
+        return;
+      }
 
+      docs.forEach(d => {
+        const c = d.data();
 
-      state.unsubs.push(
+        const other =
+          c.participants?.find(
+            p => p.key !== state.me.key
+          ) || {};
 
-        onSnapshot(
-          q,
-          snap => {
+        const row = document.createElement("button");
 
-            const list =
-              $("conversation-list");
+        row.className =
+          "conversation" +
+          (d.id === state.conversationId ? " active" : "");
 
+        row.innerHTML = `
+          <span class="avatar small"></span>
+          <span class="conv-copy">
+            <strong></strong>
+            <span class="preview"></span>
+          </span>
+          <time class="conv-time"></time>
+        `;
 
-            list.textContent = "";
+        row.querySelector(".avatar").textContent =
+          initials(other.name || other.key || "?");
 
+        row.querySelector("strong").textContent =
+          other.name || other.key || "Unknown";
 
-            if (snap.empty) {
+        row.querySelector(".preview").textContent =
+          c.lastMessage || "No messages yet";
 
-              list.innerHTML =
-                `
-                <div class="empty-small">
-                  No messages yet.
-                  Find someone above to start one.
-                </div>
-                `;
+        row.querySelector("time").textContent =
+          formatTime(c.updatedAt);
 
-              return;
+        row.onclick = () => openConversation(other);
 
-            }
-
-
-            snap.forEach(
-              d => {
-
-                const c =
-                  d.data();
-
-
-                const other =
-                  c.participants
-                    ?.find(
-                      p =>
-                        p.key !== state.me.key
-                    ) || {};
-
-
-                const row =
-                  document.createElement(
-                    "button"
-                  );
-
-
-                row.className =
-                  "conversation" +
-                  (
-                    d.id === state.conversationId
-                      ? " active"
-                      : ""
-                  );
-
-
-                row.innerHTML =
-                  `
-                  <span class="avatar small"></span>
-
-                  <span class="conv-copy">
-
-                    <strong></strong>
-
-                    <span class="preview"></span>
-
-                  </span>
-
-                  <time class="conv-time"></time>
-                  `;
-
-
-                row.querySelector(
-                  ".avatar"
-                ).textContent =
-                  initials(
-                    other.name ||
-                    other.key ||
-                    "?"
-                  );
-
-
-                row.querySelector(
-                  "strong"
-                ).textContent =
-                  other.name ||
-                  other.key ||
-                  "Unknown";
-
-
-                row.querySelector(
-                  ".preview"
-                ).textContent =
-                  c.lastMessage ||
-                  "No messages yet";
-
-
-                row.querySelector(
-                  "time"
-                ).textContent =
-                  formatTime(
-                    c.updatedAt
-                  );
-
-
-                row.onclick =
-                  () =>
-                    openConversation(
-                      other
-                    );
-
-
-                list.append(row);
-
-              }
-            );
-
-          },
-
-          err =>
-            toast(
-              "Could not load conversations: " +
-              err.message,
-              "error"
-            )
-
-        )
-
-      );
-
+        list.append(row);
+      });
     }
 
+    function listenConversations() {
+      if (!state.me) return;
+
+      /*
+       * Primary query.
+       *
+       * This is the fast/sorted version and requires the Firestore
+       * composite index:
+       *
+       * participantKeys -> ARRAY_CONTAINS
+       * updatedAt       -> DESCENDING
+       *
+       * If that index is not ready yet, the fallback below loads
+       * the same conversations without orderBy() and sorts them
+       * locally. This prevents the conversation list from being
+       * completely unusable while the index is building.
+       */
+      const sortedQuery = query(
+        collection(db, "conversations"),
+        where(
+          "participantKeys",
+          "array-contains",
+          state.me.key
+        ),
+        orderBy(
+          "updatedAt",
+          "desc"
+        ),
+        limit(50)
+      );
+
+      let fallbackStarted = false;
+
+      const unsubscribe = onSnapshot(
+        sortedQuery,
+        snap => {
+          renderConversationList(snap.docs);
+        },
+        err => {
+          console.error(
+            "Conversation query failed:",
+            err
+          );
+
+          const missingIndex =
+            err?.code === "failed-precondition" ||
+            /requires an index/i.test(
+              err?.message || ""
+            );
+
+          if (!missingIndex || fallbackStarted) {
+            renderConversationList([]);
+            toast(
+              "Could not load conversations: " +
+              (err?.message || "Unknown Firestore error."),
+              "error"
+            );
+            return;
+          }
+
+          fallbackStarted = true;
+
+          /*
+           * Fallback query without orderBy().
+           * This avoids the composite-index requirement.
+           */
+          const fallbackQuery = query(
+            collection(db, "conversations"),
+            where(
+              "participantKeys",
+              "array-contains",
+              state.me.key
+            ),
+            limit(50)
+          );
+
+          const fallbackUnsubscribe = onSnapshot(
+            fallbackQuery,
+            fallbackSnap => {
+              const docs = [...fallbackSnap.docs];
+
+              docs.sort((a, b) => {
+                const aTime =
+                  a.data().updatedAt?.toMillis?.() || 0;
+
+                const bTime =
+                  b.data().updatedAt?.toMillis?.() || 0;
+
+                return bTime - aTime;
+              });
+
+              renderConversationList(docs);
+            },
+            fallbackErr => {
+              console.error(
+                "Conversation fallback failed:",
+                fallbackErr
+              );
+
+              renderConversationList([]);
+
+              toast(
+                "Could not load conversations: " +
+                (fallbackErr?.message ||
+                  "Unknown Firestore error."),
+                "error"
+              );
+            }
+          );
+
+          state.unsubs.push(
+            fallbackUnsubscribe
+          );
+
+          toast(
+            "Conversation index is not ready. Loaded conversations using fallback sorting."
+          );
+        }
+      );
+
+      state.unsubs.push(unsubscribe);
+    }
 
     /* USER SEARCH */
 
@@ -3521,4 +3552,3 @@
 
 </body>
 </html>
-
