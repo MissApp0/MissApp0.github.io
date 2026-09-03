@@ -203,10 +203,11 @@
 
     /* APP */
 
-    .app{
-      height:100%;
-      padding:18px
-    }
+    .app {
+  min-height: 100vh;
+  height: auto;
+  overflow: visible;
+}
 
     .shell{
       height:100%;
@@ -484,12 +485,11 @@
       font-size:12px
     }
 
-    .message-area{
-      flex:1;
-      overflow:auto;
-      padding:24px clamp(16px,4vw,54px);
-      scroll-behavior:smooth
-    }
+    .message-area {
+  overflow-y: visible;
+  height: auto;
+  min-height: 0;
+}
 
     .state{
       height:100%;
