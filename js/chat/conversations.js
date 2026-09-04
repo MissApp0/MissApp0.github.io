@@ -9,6 +9,7 @@ import {
   "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 import { db } from "../firebase.js";
+import { state } from "../state.js";
 
 
 export async function searchUsers(term) {
