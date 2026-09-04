@@ -2,58 +2,121 @@
    MissApp
    js/app.js
 
-   Authentication + Firestore chat
+   Main application entry point.
+
+   Responsibilities:
+   - Build application UI
+   - Handle authentication state
+   - Create/load current user profile
+   - Connect auth modules
+   - Connect search module
+   - Connect conversation module
+   - Connect chat/message module
 ========================================================= */
 
-import { auth, db } from "./firebase.js";
+
+/* =========================================================
+   FIREBASE
+========================================================= */
+
+import {
+  auth,
+  db
+} from "./firebase.js";
+
 
 import {
   onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signOut
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+} from
+  "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
 
 import {
-  collection,
   doc,
   getDoc,
-  getDocs,
   setDoc,
-  addDoc,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
   serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+} from
+  "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+
+/* =========================================================
+   AUTH MODULES
+========================================================= */
+
+import {
+  login
+} from "./auth/login.js";
+
+
+import {
+  register
+} from "./auth/register.js";
 
 
 /* =========================================================
    STATE
 ========================================================= */
 
-const state = {
-  user: null,
-  registerMode: false,
-  currentConversation: null,
-  unsubscribeMessages: null,
-  unsubscribeConversations: null
-};
-
-window.MissApp = state;
+import {
+  state
+} from "./state.js";
 
 
 /* =========================================================
-   START APP
+   CHAT MODULES
 ========================================================= */
 
-document.addEventListener("DOMContentLoaded", () => {
+import {
+  searchUsers
+} from "./chat/search.js";
+
+
+import {
+  listenConversations,
+  getOrCreateConversation
+} from "./chat/conversations.js";
+
+
+import {
+  openChat,
+  sendMessage
+} from "./chat/app.js";
+
+
+/* =========================================================
+   INITIALIZATION
+========================================================= */
+
+document.addEventListener(
+  "DOMContentLoaded",
+  initialize
+);
+
+
+function initialize() {
+
+  console.log(
+    "MissApp: initializing..."
+  );
+
+
   createAuthUI();
+
   createAppUI();
-  setupEvents();
-  setupAuth();
-});
+
+  setupAuthEvents();
+
+  setupChatEvents();
+
+  setupAuthState();
+
+
+  console.log(
+    "MissApp: initialized."
+  );
+}
 
 
 /* =========================================================
@@ -61,14 +124,25 @@ document.addEventListener("DOMContentLoaded", () => {
 ========================================================= */
 
 function createAuthUI() {
-  const authContainer = document.getElementById("auth");
 
-  if (!authContainer) {
-    console.error("MissApp: #auth not found");
+  const container =
+    document.getElementById(
+      "auth"
+    );
+
+
+  if (!container) {
+
+    console.error(
+      "MissApp: #auth not found."
+    );
+
     return;
   }
 
-  authContainer.innerHTML = `
+
+  container.innerHTML = `
+
     <div class="auth-card">
 
       <div class="auth-title">
@@ -79,10 +153,19 @@ function createAuthUI() {
         Secure real-time messaging
       </div>
 
-      <form id="login-form" class="auth-form">
+
+      <!-- LOGIN -->
+
+      <form
+        id="login-form"
+        class="auth-form"
+      >
 
         <div class="auth-field">
-          <label class="auth-label">Email</label>
+
+          <label class="auth-label">
+            Email
+          </label>
 
           <input
             class="input"
@@ -92,10 +175,15 @@ function createAuthUI() {
             autocomplete="email"
             required
           >
+
         </div>
 
+
         <div class="auth-field">
-          <label class="auth-label">Password</label>
+
+          <label class="auth-label">
+            Password
+          </label>
 
           <input
             class="input"
@@ -105,19 +193,32 @@ function createAuthUI() {
             autocomplete="current-password"
             required
           >
+
         </div>
 
-        <button class="btn" type="submit">
+
+        <button
+          class="btn"
+          type="submit"
+        >
           Login
         </button>
 
       </form>
 
 
-      <form id="register-form" class="auth-form hidden">
+      <!-- REGISTER -->
+
+      <form
+        id="register-form"
+        class="auth-form hidden"
+      >
 
         <div class="auth-field">
-          <label class="auth-label">Email</label>
+
+          <label class="auth-label">
+            Email
+          </label>
 
           <input
             class="input"
@@ -127,10 +228,15 @@ function createAuthUI() {
             autocomplete="email"
             required
           >
+
         </div>
 
+
         <div class="auth-field">
-          <label class="auth-label">Password</label>
+
+          <label class="auth-label">
+            Password
+          </label>
 
           <input
             class="input"
@@ -141,14 +247,21 @@ function createAuthUI() {
             minlength="6"
             required
           >
+
         </div>
 
-        <button class="btn" type="submit">
+
+        <button
+          class="btn"
+          type="submit"
+        >
           Create Account
         </button>
 
       </form>
 
+
+      <!-- SWITCH -->
 
       <div class="auth-switch">
 
@@ -175,11 +288,25 @@ function createAuthUI() {
 ========================================================= */
 
 function createAppUI() {
-  const sidebar = document.getElementById("sidebar");
-  const chat = document.getElementById("chat");
+
+  const sidebar =
+    document.getElementById(
+      "sidebar"
+    );
+
+
+  const chat =
+    document.getElementById(
+      "chat"
+    );
+
 
   if (!sidebar || !chat) {
-    console.error("MissApp: #sidebar or #chat not found");
+
+    console.error(
+      "MissApp: #sidebar or #chat not found."
+    );
+
     return;
   }
 
@@ -196,6 +323,7 @@ function createAppUI() {
         MissApp
       </div>
 
+
       <div class="search-container">
 
         <input
@@ -205,6 +333,7 @@ function createAppUI() {
           placeholder="Search users..."
           autocomplete="off"
         >
+
 
         <div
           id="search-results"
@@ -221,6 +350,7 @@ function createAppUI() {
       <div class="chat-empty">
 
         <div>
+
           <div class="chat-empty-title">
             No conversations
           </div>
@@ -228,6 +358,7 @@ function createAppUI() {
           <div>
             Search for someone to start chatting.
           </div>
+
         </div>
 
       </div>
@@ -246,6 +377,7 @@ function createAppUI() {
       </button>
 
     </div>
+
   `;
 
 
@@ -265,12 +397,14 @@ function createAppUI() {
         ←
       </button>
 
+
       <div
         id="chat-avatar"
         class="conversation-avatar"
       >
         ?
       </div>
+
 
       <div class="chat-header-info">
 
@@ -280,6 +414,7 @@ function createAppUI() {
         >
           Select a conversation
         </div>
+
 
         <div
           id="chat-status"
@@ -292,6 +427,8 @@ function createAppUI() {
 
     </header>
 
+
+    <!-- MESSAGE AREA -->
 
     <div id="messages">
 
@@ -314,6 +451,8 @@ function createAppUI() {
     </div>
 
 
+    <!-- COMPOSER -->
+
     <div class="chat-composer">
 
       <form
@@ -329,10 +468,11 @@ function createAppUI() {
           disabled
         ></textarea>
 
+
         <button
+          id="send-button"
           class="composer-send"
           type="submit"
-          id="send-button"
           disabled
         >
           ➤
@@ -341,154 +481,494 @@ function createAppUI() {
       </form>
 
     </div>
+
   `;
 }
 
 
 /* =========================================================
-   EVENTS
+   AUTH EVENTS
 ========================================================= */
 
-function setupEvents() {
+function setupAuthEvents() {
 
-  document
-    .getElementById("login-form")
-    ?.addEventListener("submit", handleLogin);
+  const loginForm =
+    document.getElementById(
+      "login-form"
+    );
 
-  document
-    .getElementById("register-form")
-    ?.addEventListener("submit", handleRegister);
 
-  document
-    .getElementById("auth-switch-button")
-    ?.addEventListener("click", toggleAuth);
+  const registerForm =
+    document.getElementById(
+      "register-form"
+    );
 
-  document
-    .getElementById("logout-button")
-    ?.addEventListener("click", handleLogout);
 
-  document
-    .getElementById("user-search")
-    ?.addEventListener("input", handleSearch);
+  const switchButton =
+    document.getElementById(
+      "auth-switch-button"
+    );
 
-  document
-    .getElementById("back-button")
-    ?.addEventListener("click", () => {
-      document.body.classList.remove("chat-open");
-    });
+
+  const logoutButton =
+    document.getElementById(
+      "logout-button"
+    );
+
+
+  loginForm?.addEventListener(
+    "submit",
+    handleLogin
+  );
+
+
+  registerForm?.addEventListener(
+    "submit",
+    handleRegister
+  );
+
+
+  switchButton?.addEventListener(
+    "click",
+    toggleAuth
+  );
+
+
+  logoutButton?.addEventListener(
+    "click",
+    handleLogout
+  );
+}
+
+
+/* =========================================================
+   CHAT EVENTS
+========================================================= */
+
+function setupChatEvents() {
+
+  const searchInput =
+    document.getElementById(
+      "user-search"
+    );
 
 
   const composer =
-    document.getElementById("composer-form");
+    document.getElementById(
+      "composer-form"
+    );
+
 
   const messageInput =
-    document.getElementById("message-input");
+    document.getElementById(
+      "message-input"
+    );
 
 
-  composer?.addEventListener("submit", async event => {
-
-    event.preventDefault();
-
-    const text = messageInput.value.trim();
-
-    if (!text) return;
-
-    if (!state.currentConversation) {
-      showToast(
-        "Select a conversation first.",
-        "error"
-      );
-      return;
-    }
-
-    await sendMessage(text);
-
-    messageInput.value = "";
-    messageInput.style.height = "auto";
-  });
+  const backButton =
+    document.getElementById(
+      "back-button"
+    );
 
 
-  messageInput?.addEventListener("input", () => {
+  /* =======================================================
+     SEARCH
+  ======================================================= */
 
-    messageInput.style.height = "auto";
-
-    messageInput.style.height =
-      Math.min(
-        messageInput.scrollHeight,
-        140
-      ) + "px";
-  });
+  searchInput?.addEventListener(
+    "input",
+    handleSearch
+  );
 
 
-  messageInput?.addEventListener("keydown", event => {
+  /* =======================================================
+     COMPOSER
+  ======================================================= */
 
-    if (
-      event.key === "Enter" &&
-      !event.shiftKey
-    ) {
+  composer?.addEventListener(
+    "submit",
+    async event => {
 
       event.preventDefault();
 
-      composer.requestSubmit();
+
+      if (!messageInput) {
+        return;
+      }
+
+
+      const text =
+        messageInput.value.trim();
+
+
+      if (!text) {
+        return;
+      }
+
+
+      if (!state.currentConversation) {
+
+        showToast(
+          "Select a conversation first.",
+          "error"
+        );
+
+        return;
+      }
+
+
+      const sendButton =
+        document.getElementById(
+          "send-button"
+        );
+
+
+      if (sendButton) {
+        sendButton.disabled = true;
+      }
+
+
+      try {
+
+        await sendMessage(text);
+
+        messageInput.value = "";
+
+        messageInput.style.height =
+          "auto";
+
+      } finally {
+
+        if (sendButton) {
+          sendButton.disabled = false;
+        }
+      }
     }
-  });
+  );
+
+
+  /* =======================================================
+     TEXTAREA RESIZE
+  ======================================================= */
+
+  messageInput?.addEventListener(
+    "input",
+    () => {
+
+      messageInput.style.height =
+        "auto";
+
+
+      messageInput.style.height =
+        Math.min(
+          messageInput.scrollHeight,
+          140
+        ) + "px";
+    }
+  );
+
+
+  /* =======================================================
+     ENTER TO SEND
+  ======================================================= */
+
+  messageInput?.addEventListener(
+    "keydown",
+    event => {
+
+      if (
+        event.key === "Enter" &&
+        !event.shiftKey
+      ) {
+
+        event.preventDefault();
+
+        composer?.requestSubmit();
+      }
+    }
+  );
+
+
+  /* =======================================================
+     BACK
+  ======================================================= */
+
+  backButton?.addEventListener(
+    "click",
+    () => {
+
+      document.body.classList.remove(
+        "chat-open"
+      );
+
+      state.currentConversation =
+        null;
+
+
+      const input =
+        document.getElementById(
+          "message-input"
+        );
+
+
+      const send =
+        document.getElementById(
+          "send-button"
+        );
+
+
+      input?.setAttribute(
+        "disabled",
+        ""
+      );
+
+
+      send?.setAttribute(
+        "disabled",
+        ""
+      );
+    }
+  );
 }
 
 
 /* =========================================================
-   AUTH STATE
+   FIREBASE AUTH STATE
 ========================================================= */
 
-function setupAuth() {
+function setupAuthState() {
 
-  onAuthStateChanged(auth, async user => {
+  onAuthStateChanged(
+    auth,
+    async user => {
 
-    state.user = user;
+      state.user =
+        user || null;
 
-    if (user) {
 
-      showApp();
+      if (!user) {
 
-      await ensureUserDocument(user);
+        cleanup();
 
-      listenToConversations();
+        showAuth();
 
-    } else {
+        return;
+      }
 
-      cleanupListeners();
 
-      state.currentConversation = null;
+      try {
 
-      showAuth();
+        state.me =
+          await loadCurrentUser(
+            user
+          );
+
+
+        showApp();
+
+
+        listenConversations(
+          renderConversations
+        );
+
+
+      } catch (error) {
+
+        console.error(
+          "MissApp startup error:",
+          error
+        );
+
+
+        showToast(
+          "Could not start the app.",
+          "error"
+        );
+      }
     }
-  });
+  );
 }
 
 
 /* =========================================================
-   USER DOCUMENT
+   LOAD CURRENT USER
 ========================================================= */
 
-async function ensureUserDocument(user) {
+async function loadCurrentUser(
+  user
+) {
 
   const userRef =
-    doc(db, "users", user.uid);
+    doc(
+      db,
+      "users",
+      user.uid
+    );
+
 
   const snapshot =
-    await getDoc(userRef);
+    await getDoc(
+      userRef
+    );
 
-  if (!snapshot.exists()) {
 
-    await setDoc(userRef, {
+  if (snapshot.exists()) {
+
+    const data =
+      snapshot.data();
+
+
+    /*
+      Make sure older accounts also
+      receive a usable search key.
+    */
+
+    const displayName =
+      data.displayName ||
+      user.displayName ||
+      user.email?.split("@")[0] ||
+      "User";
+
+
+    const key =
+      data.key ||
+      createUserKey(
+        displayName,
+        user.email
+      );
+
+
+    if (
+      !data.key ||
+      !data.displayName
+    ) {
+
+      await setDoc(
+        userRef,
+        {
+          uid: user.uid,
+
+          email:
+            user.email || "",
+
+          displayName,
+
+          key,
+
+          updatedAt:
+            serverTimestamp()
+        },
+        {
+          merge: true
+        }
+      );
+    }
+
+
+    return {
       uid: user.uid,
-      email: user.email || "",
-      displayName:
-        user.displayName ||
-        user.email?.split("@")[0] ||
-        "User",
-      createdAt: serverTimestamp()
-    });
+
+      email:
+        data.email ||
+        user.email ||
+        "",
+
+      displayName,
+
+      key
+    };
   }
+
+
+  /*
+    New user
+  */
+
+  const displayName =
+    user.displayName ||
+    user.email?.split("@")[0] ||
+    "User";
+
+
+  const key =
+    createUserKey(
+      displayName,
+      user.email
+    );
+
+
+  const profile = {
+
+    uid: user.uid,
+
+    email:
+      user.email || "",
+
+    displayName,
+
+    key,
+
+    createdAt:
+      serverTimestamp()
+  };
+
+
+  await setDoc(
+    userRef,
+    profile
+  );
+
+
+  return {
+    uid: user.uid,
+
+    email:
+      user.email || "",
+
+    displayName,
+
+    key
+  };
+}
+
+
+/* =========================================================
+   CREATE USER SEARCH KEY
+========================================================= */
+
+function createUserKey(
+  displayName,
+  email
+) {
+
+  const name =
+    String(
+      displayName || ""
+    )
+      .trim()
+      .toLowerCase();
+
+
+  const mail =
+    String(
+      email || ""
+    )
+      .trim()
+      .toLowerCase();
+
+
+  /*
+    Search uses prefix matching.
+
+    Prefer display name. If unavailable,
+    fall back to email.
+  */
+
+  return (
+    name ||
+    mail ||
+    "user"
+  );
 }
 
 
@@ -498,13 +978,26 @@ async function ensureUserDocument(user) {
 
 function showAuth() {
 
-  document
-    .getElementById("auth")
-    ?.classList.remove("hidden");
+  const authContainer =
+    document.getElementById(
+      "auth"
+    );
 
-  document
-    .getElementById("app")
-    ?.classList.add("hidden");
+
+  const app =
+    document.getElementById(
+      "app"
+    );
+
+
+  authContainer?.classList.remove(
+    "hidden"
+  );
+
+
+  app?.classList.add(
+    "hidden"
+  );
 }
 
 
@@ -514,13 +1007,26 @@ function showAuth() {
 
 function showApp() {
 
-  document
-    .getElementById("auth")
-    ?.classList.add("hidden");
+  const authContainer =
+    document.getElementById(
+      "auth"
+    );
 
-  document
-    .getElementById("app")
-    ?.classList.remove("hidden");
+
+  const app =
+    document.getElementById(
+      "app"
+    );
+
+
+  authContainer?.classList.add(
+    "hidden"
+  );
+
+
+  app?.classList.remove(
+    "hidden"
+  );
 }
 
 
@@ -528,41 +1034,78 @@ function showApp() {
    LOGIN
 ========================================================= */
 
-async function handleLogin(event) {
+async function handleLogin(
+  event
+) {
 
   event.preventDefault();
 
-  const form = event.currentTarget;
+
+  const form =
+    event.currentTarget;
+
 
   const email =
-    form.elements.email.value.trim();
+    form.elements.email.value
+      .trim();
+
 
   const password =
     form.elements.password.value;
 
+
+  if (!email || !password) {
+    return;
+  }
+
+
+  const button =
+    form.querySelector(
+      "button[type='submit']"
+    );
+
+
+  if (button) {
+    button.disabled = true;
+  }
+
+
   try {
 
-    await signInWithEmailAndPassword(
-      auth,
+    await login(
       email,
       password
     );
 
+
     form.reset();
+
 
     showToast(
       "Welcome back!",
       "success"
     );
 
+
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "Login error:",
+      error
+    );
+
 
     showToast(
       getAuthError(error),
       "error"
     );
+
+
+  } finally {
+
+    if (button) {
+      button.disabled = false;
+    }
   }
 }
 
@@ -571,17 +1114,25 @@ async function handleLogin(event) {
    REGISTER
 ========================================================= */
 
-async function handleRegister(event) {
+async function handleRegister(
+  event
+) {
 
   event.preventDefault();
 
-  const form = event.currentTarget;
+
+  const form =
+    event.currentTarget;
+
 
   const email =
-    form.elements.email.value.trim();
+    form.elements.email.value
+      .trim();
+
 
   const password =
     form.elements.password.value;
+
 
   if (password.length < 6) {
 
@@ -593,35 +1144,60 @@ async function handleRegister(event) {
     return;
   }
 
+
+  const button =
+    form.querySelector(
+      "button[type='submit']"
+    );
+
+
+  if (button) {
+    button.disabled = true;
+  }
+
+
   try {
 
-    await createUserWithEmailAndPassword(
-      auth,
+    await register(
       email,
       password
     );
 
+
     form.reset();
+
 
     showToast(
       "Account created!",
       "success"
     );
 
+
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "Registration error:",
+      error
+    );
+
 
     showToast(
       getAuthError(error),
       "error"
     );
+
+
+  } finally {
+
+    if (button) {
+      button.disabled = false;
+    }
   }
 }
 
 
 /* =========================================================
-   AUTH SWITCH
+   TOGGLE LOGIN / REGISTER
 ========================================================= */
 
 function toggleAuth() {
@@ -629,47 +1205,82 @@ function toggleAuth() {
   state.registerMode =
     !state.registerMode;
 
+
   const loginForm =
-    document.getElementById("login-form");
+    document.getElementById(
+      "login-form"
+    );
+
 
   const registerForm =
-    document.getElementById("register-form");
+    document.getElementById(
+      "register-form"
+    );
+
 
   const text =
-    document.getElementById("auth-switch-text");
+    document.getElementById(
+      "auth-switch-text"
+    );
+
 
   const button =
-    document.getElementById("auth-switch-button");
+    document.getElementById(
+      "auth-switch-button"
+    );
 
 
-  if (state.registerMode) {
+  if (
+    state.registerMode
+  ) {
 
-    loginForm?.classList.add("hidden");
+    loginForm?.classList.add(
+      "hidden"
+    );
 
-    registerForm?.classList.remove("hidden");
+
+    registerForm?.classList.remove(
+      "hidden"
+    );
+
 
     if (text) {
+
       text.textContent =
         "Already have an account?";
     }
 
+
     if (button) {
-      button.textContent = "Login";
+
+      button.textContent =
+        "Login";
     }
+
 
   } else {
 
-    registerForm?.classList.add("hidden");
+    registerForm?.classList.add(
+      "hidden"
+    );
 
-    loginForm?.classList.remove("hidden");
+
+    loginForm?.classList.remove(
+      "hidden"
+    );
+
 
     if (text) {
+
       text.textContent =
         "Don't have an account?";
     }
 
+
     if (button) {
-      button.textContent = "Register";
+
+      button.textContent =
+        "Register";
     }
   }
 }
@@ -683,16 +1294,24 @@ async function handleLogout() {
 
   try {
 
-    await signOut(auth);
+    await signOut(
+      auth
+    );
+
 
     showToast(
       "Logged out.",
       "success"
     );
 
+
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "Logout error:",
+      error
+    );
+
 
     showToast(
       "Logout failed.",
@@ -703,22 +1322,38 @@ async function handleLogout() {
 
 
 /* =========================================================
-   USER SEARCH
+   SEARCH
 ========================================================= */
 
-let searchTimer = null;
+let searchTimer =
+  null;
 
-function handleSearch(event) {
+
+function handleSearch(
+  event
+) {
 
   const term =
-    event.target.value.trim().toLowerCase();
+    event.target.value
+      .trim()
+      .toLowerCase();
 
-  clearTimeout(searchTimer);
 
   const results =
-    document.getElementById("search-results");
+    document.getElementById(
+      "search-results"
+    );
 
-  if (!results) return;
+
+  clearTimeout(
+    searchTimer
+  );
+
+
+  if (!results) {
+    return;
+  }
+
 
   if (!term) {
 
@@ -728,26 +1363,6 @@ function handleSearch(event) {
   }
 
 
-  searchTimer =
-    setTimeout(
-      () => searchUsers(term),
-      250
-    );
-}
-
-
-/* =========================================================
-   SEARCH USERS
-========================================================= */
-
-async function searchUsers(term) {
-
-  const results =
-    document.getElementById("search-results");
-
-  if (!results || !state.user) return;
-
-
   results.innerHTML = `
     <div class="search-loading">
       Searching...
@@ -755,292 +1370,143 @@ async function searchUsers(term) {
   `;
 
 
-  try {
+  searchTimer =
+    setTimeout(
+      async () => {
 
-    /*
-      Firestore does not provide arbitrary
-      substring search natively.
+        try {
 
-      This implementation loads users and
-      filters locally. For a large app,
-      use a dedicated search service/index.
-    */
-
-    const snapshot =
-      await getDocs(
-        collection(db, "users")
-      );
+          const users =
+            await searchUsers(
+              term
+            );
 
 
-    const users = [];
-
-    snapshot.forEach(userDoc => {
-
-      const user =
-        userDoc.data();
-
-      if (
-        user.uid === state.user.uid
-      ) {
-        return;
-      }
-
-      const email =
-        String(user.email || "")
-          .toLowerCase();
-
-      const name =
-        String(user.displayName || "")
-          .toLowerCase();
-
-      if (
-        email.includes(term) ||
-        name.includes(term)
-      ) {
-        users.push({
-          id: userDoc.id,
-          ...user
-        });
-      }
-    });
+          renderSearchResults(
+            users
+          );
 
 
-    if (!users.length) {
+        } catch (error) {
 
-      results.innerHTML = `
-        <div class="search-empty">
-          No users found.
-        </div>
-      `;
-
-      return;
-    }
+          console.error(
+            "Search error:",
+            error
+          );
 
 
-    results.innerHTML =
-      users.slice(0, 10).map(user => `
-
-        <button
-          class="search-result"
-          type="button"
-          data-user-id="${escapeHTML(user.uid)}"
-        >
-
-          <div class="conversation-avatar">
-            ${escapeHTML(
-              getInitial(
-                user.displayName ||
-                user.email
-              )
-            )}
-          </div>
-
-          <div class="search-result-info">
-
-            <div>
-              ${escapeHTML(
-                user.displayName ||
-                "User"
-              )}
+          results.innerHTML = `
+            <div class="search-empty">
+              Search failed.
             </div>
+          `;
+        }
 
-            <small>
-              ${escapeHTML(
-                user.email || ""
-              )}
-            </small>
-
-          </div>
-
-        </button>
-
-      `).join("");
+      },
+      250
+    );
+}
 
 
-    results
-      .querySelectorAll(".search-result")
-      .forEach(button => {
+/* =========================================================
+   RENDER SEARCH RESULTS
+========================================================= */
 
-        button.addEventListener(
-          "click",
-          () => {
+function renderSearchResults(
+  users
+) {
 
-            const userId =
-              button.dataset.userId;
+  const results =
+    document.getElementById(
+      "search-results"
+    );
 
-            startConversation(userId);
 
-            results.innerHTML = "";
+  if (!results) {
+    return;
+  }
 
-            const input =
-              document.getElementById(
-                "user-search"
-              );
 
-            if (input) {
-              input.value = "";
-            }
-          }
-        );
-      });
-
-  } catch (error) {
-
-    console.error(error);
+  if (!users.length) {
 
     results.innerHTML = `
       <div class="search-empty">
-        Search failed.
+        No users found.
       </div>
     `;
-  }
-}
-
-
-/* =========================================================
-   CONVERSATIONS
-========================================================= */
-
-function getConversationId(uid1, uid2) {
-
-  return [uid1, uid2]
-    .sort()
-    .join("_");
-}
-
-
-async function startConversation(otherUserId) {
-
-  if (!state.user) return;
-
-  if (otherUserId === state.user.uid) {
-    return;
-  }
-
-
-  const otherUserRef =
-    doc(db, "users", otherUserId);
-
-  const otherSnapshot =
-    await getDoc(otherUserRef);
-
-  if (!otherSnapshot.exists()) {
-
-    showToast(
-      "User no longer exists.",
-      "error"
-    );
 
     return;
   }
 
 
-  const otherUser =
-    otherSnapshot.data();
-
-
-  const conversationId =
-    getConversationId(
-      state.user.uid,
-      otherUserId
-    );
-
-
-  const conversationRef =
-    doc(
-      db,
-      "conversations",
-      conversationId
-    );
-
-
-  const existing =
-    await getDoc(conversationRef);
-
-
-  if (!existing.exists()) {
-
-    await setDoc(conversationRef, {
-      participants: [
-        state.user.uid,
-        otherUserId
-      ],
-      participantData: {
-        [state.user.uid]: {
-          uid: state.user.uid,
-          email: state.user.email || ""
-        },
-        [otherUserId]: {
-          uid: otherUserId,
-          email: otherUser.email || "",
-          displayName:
-            otherUser.displayName ||
-            otherUser.email ||
-            "User"
-        }
-      },
-      lastMessage: "",
-      lastMessageAt: null,
-      createdAt: serverTimestamp()
-    });
-  }
-
-
-  openConversation({
-    id: conversationId,
-    otherUserId,
-    otherUser
-  });
-}
-
-
-/* =========================================================
-   CONVERSATION LIST
-========================================================= */
-
-function listenToConversations() {
-
-  if (!state.user) return;
-
-  state.unsubscribeConversations?.();
-
-
-  const q =
-    query(
-      collection(db, "conversations"),
-      where(
-        "participants",
-        "array-contains",
-        state.user.uid
+  results.innerHTML =
+    users
+      .filter(
+        user =>
+          user.uid !==
+          state.user?.uid
       )
-    );
+      .slice(0, 8)
+      .map(
+        user => `
+
+          <button
+            type="button"
+            class="search-result"
+            data-user-id="${escapeHTML(
+              user.uid ||
+              user.id
+            )}"
+          >
+
+            <div class="conversation-avatar">
+              ${escapeHTML(
+                getInitial(
+                  user.displayName ||
+                  user.email
+                )
+              )}
+            </div>
 
 
-  state.unsubscribeConversations =
-    onSnapshot(
-      q,
-      snapshot => {
+            <div class="search-result-info">
 
-        const conversations =
-          snapshot.docs.map(item => ({
-            id: item.id,
-            ...item.data()
-          }));
+              <div>
+                ${escapeHTML(
+                  user.displayName ||
+                  "User"
+                )}
+              </div>
 
-        renderConversationList(
-          conversations
-        );
-      },
-      error => {
+              <small>
+                ${escapeHTML(
+                  user.email ||
+                  ""
+                )}
+              </small>
 
-        console.error(
-          "Conversation listener:",
-          error
-        );
+            </div>
 
-        showToast(
-          "Could not load conversations.",
-          "error"
+          </button>
+        `
+      )
+      .join("");
+
+
+  results
+    .querySelectorAll(
+      ".search-result"
+    )
+    .forEach(
+      button => {
+
+        button.addEventListener(
+          "click",
+          () =>
+            handleUserSelected(
+              button.dataset.userId,
+              users
+            )
         );
       }
     );
@@ -1048,24 +1514,101 @@ function listenToConversations() {
 
 
 /* =========================================================
-   RENDER CONVERSATIONS
+   SELECT USER
 ========================================================= */
 
-function renderConversationList(
-  conversations
+async function handleUserSelected(
+  userId,
+  users
 ) {
 
-  const list =
+  const user =
+    users.find(
+      item =>
+        item.uid === userId ||
+        item.id === userId
+    );
+
+
+  if (!user) {
+    return;
+  }
+
+
+  try {
+
+    const conversation =
+      await getOrCreateConversation(
+        {
+          uid:
+            user.uid ||
+            user.id,
+
+          email:
+            user.email ||
+            "",
+
+          displayName:
+            user.displayName ||
+            user.email ||
+            "User",
+
+          key:
+            user.key ||
+            createUserKey(
+              user.displayName,
+              user.email
+            )
+        }
+      );
+
+
+    clearSearch();
+
+
+    openChat(
+      conversation
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "Conversation error:",
+      error
+    );
+
+
+    showToast(
+      "Could not open conversation.",
+      "error"
+    );
+  }
+}
+
+
+/* =========================================================
+   CONVERSATION RENDERING
+========================================================= */
+
+function renderConversations(
+  docs
+) {
+
+  const container =
     document.getElementById(
       "conversation-list"
     );
 
-  if (!list) return;
+
+  if (!container) {
+    return;
+  }
 
 
-  if (!conversations.length) {
+  if (!docs.length) {
 
-    list.innerHTML = `
+    container.innerHTML = `
       <div class="chat-empty">
 
         <div>
@@ -1087,219 +1630,94 @@ function renderConversationList(
   }
 
 
-  list.innerHTML =
-    conversations.map(conversation => {
+  container.innerHTML =
+    docs
+      .map(
+        conversationDoc => {
 
-      const otherUserId =
-        conversation.participants
-          ?.find(
-            uid =>
-              uid !== state.user.uid
-          );
+          const data =
+            conversationDoc.data();
 
 
-      const other =
-        conversation
-          .participantData
-          ?.[otherUserId] || {};
-
-
-      return `
-
-        <button
-          class="conversation-item"
-          type="button"
-          data-conversation-id="${escapeHTML(conversation.id)}"
-          data-user-id="${escapeHTML(otherUserId || "")}"
-        >
-
-          <div class="conversation-avatar">
-            ${escapeHTML(
-              getInitial(
-                other.displayName ||
-                other.email
-              )
-            )}
-          </div>
-
-          <div class="conversation-info">
-
-            <div class="conversation-name">
-              ${escapeHTML(
-                other.displayName ||
-                other.email ||
-                "User"
-              )}
-            </div>
-
-            <div class="conversation-preview">
-              ${escapeHTML(
-                conversation.lastMessage ||
-                "No messages yet"
-              )}
-            </div>
-
-          </div>
-
-        </button>
-      `;
-    }).join("");
-
-
-  list
-    .querySelectorAll(".conversation-item")
-    .forEach(button => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          const conversationId =
-            button.dataset.conversationId;
-
-          const otherUserId =
-            button.dataset.userId;
-
-          const conversation =
-            conversations.find(
-              item =>
-                item.id === conversationId
+          const otherUid =
+            data.participants?.find(
+              uid =>
+                uid !==
+                state.user?.uid
             );
 
-          const otherUser =
-            conversation
-              ?.participantData
-              ?.[otherUserId] || {};
+
+          const other =
+            data.participantData?.[
+              otherUid
+            ] || {};
 
 
-          openConversation({
-            id: conversationId,
-            otherUserId,
-            otherUser
-          });
+          return `
+
+            <button
+              type="button"
+              class="conversation-item"
+              data-conversation-id="${escapeHTML(
+                conversationDoc.id
+              )}"
+              data-user-id="${escapeHTML(
+                otherUid || ""
+              )}"
+            >
+
+              <div class="conversation-avatar">
+                ${escapeHTML(
+                  getInitial(
+                    other.displayName ||
+                    other.email
+                  )
+                )}
+              </div>
+
+
+              <div class="conversation-info">
+
+                <div class="conversation-name">
+                  ${escapeHTML(
+                    other.displayName ||
+                    other.email ||
+                    "User"
+                  )}
+                </div>
+
+
+                <div class="conversation-preview">
+                  ${escapeHTML(
+                    data.lastMessage ||
+                    "No messages yet"
+                  )}
+                </div>
+
+              </div>
+
+            </button>
+          `;
         }
-      );
-    });
-}
+      )
+      .join("");
 
 
-/* =========================================================
-   OPEN CONVERSATION
-========================================================= */
+  container
+    .querySelectorAll(
+      ".conversation-item"
+    )
+    .forEach(
+      button => {
 
-function openConversation(conversation) {
-
-  state.currentConversation =
-    conversation;
-
-
-  const name =
-    document.getElementById("chat-name");
-
-  const status =
-    document.getElementById("chat-status");
-
-  const avatar =
-    document.getElementById("chat-avatar");
-
-  const input =
-    document.getElementById("message-input");
-
-  const send =
-    document.getElementById("send-button");
-
-
-  if (name) {
-
-    name.textContent =
-      conversation.otherUser
-        ?.displayName ||
-      conversation.otherUser
-        ?.email ||
-      "User";
-  }
-
-
-  if (status) {
-
-    status.textContent =
-      conversation.otherUser
-        ?.email || "";
-  }
-
-
-  if (avatar) {
-
-    avatar.textContent =
-      getInitial(
-        conversation.otherUser
-          ?.displayName ||
-        conversation.otherUser
-          ?.email
-      );
-  }
-
-
-  input?.removeAttribute("disabled");
-
-  send?.removeAttribute("disabled");
-
-
-  document.body.classList.add(
-    "chat-open"
-  );
-
-
-  listenToMessages(
-    conversation.id
-  );
-}
-
-
-/* =========================================================
-   MESSAGES
-========================================================= */
-
-function listenToMessages(conversationId) {
-
-  state.unsubscribeMessages?.();
-
-
-  const q =
-    query(
-      collection(
-        db,
-        "conversations",
-        conversationId,
-        "messages"
-      ),
-      orderBy("createdAt", "asc")
-    );
-
-
-  state.unsubscribeMessages =
-    onSnapshot(
-      q,
-      snapshot => {
-
-        const messages =
-          snapshot.docs.map(item => ({
-            id: item.id,
-            ...item.data()
-          }));
-
-        renderMessages(messages);
-      },
-      error => {
-
-        console.error(
-          "Message listener:",
-          error
-        );
-
-        showToast(
-          "Could not load messages.",
-          "error"
+        button.addEventListener(
+          "click",
+          () =>
+            handleConversationSelected(
+              button.dataset.conversationId,
+              button.dataset.userId,
+              docs
+            )
         );
       }
     );
@@ -1307,134 +1725,87 @@ function listenToMessages(conversationId) {
 
 
 /* =========================================================
-   SEND MESSAGE
+   SELECT CONVERSATION
 ========================================================= */
 
-async function sendMessage(text) {
+async function handleConversationSelected(
+  conversationId,
+  otherUserId,
+  docs
+) {
 
-  if (
-    !state.user ||
-    !state.currentConversation
-  ) {
+  const selected =
+    docs.find(
+      doc =>
+        doc.id ===
+        conversationId
+    );
+
+
+  if (!selected) {
     return;
   }
 
 
-  const conversationId =
-    state.currentConversation.id;
+  const data =
+    selected.data();
 
 
-  try {
-
-    await addDoc(
-      collection(
-        db,
-        "conversations",
-        conversationId,
-        "messages"
-      ),
-      {
-        senderId: state.user.uid,
-        text,
-        createdAt: serverTimestamp()
-      }
-    );
+  const other =
+    data.participantData?.[
+      otherUserId
+    ];
 
 
-    await setDoc(
-      doc(
-        db,
-        "conversations",
-        conversationId
-      ),
-      {
-        lastMessage: text,
-        lastMessageAt: serverTimestamp()
-      },
-      {
-        merge: true
-      }
-    );
-
-
-  } catch (error) {
-
-    console.error(error);
+  if (!other) {
 
     showToast(
-      "Message could not be sent.",
+      "Conversation data is incomplete.",
       "error"
     );
-  }
-}
-
-
-/* =========================================================
-   RENDER MESSAGES
-========================================================= */
-
-function renderMessages(messages) {
-
-  const container =
-    document.getElementById("messages");
-
-  if (!container) return;
-
-
-  if (!messages.length) {
-
-    container.innerHTML = `
-      <div class="chat-empty">
-
-        <div>
-
-          <div class="chat-empty-title">
-            No messages yet
-          </div>
-
-          <div>
-            Send the first message.
-          </div>
-
-        </div>
-
-      </div>
-    `;
 
     return;
   }
 
 
-  container.innerHTML =
-    messages.map(message => {
+  openChat({
 
-      const mine =
-        message.senderId ===
-        state.user?.uid;
+    id:
+      conversationId,
 
+    otherUserId,
 
-      return `
-
-        <div
-          class="message-row ${mine ? "message-mine" : "message-theirs"}"
-        >
-
-          <div class="message-bubble">
-            ${escapeHTML(message.text || "")}
-          </div>
-
-        </div>
-
-      `;
-
-    }).join("");
-
-
-  requestAnimationFrame(() => {
-
-    container.scrollTop =
-      container.scrollHeight;
+    otherUser: other
   });
+}
+
+
+/* =========================================================
+   CLEAR SEARCH
+========================================================= */
+
+function clearSearch() {
+
+  const input =
+    document.getElementById(
+      "user-search"
+    );
+
+
+  const results =
+    document.getElementById(
+      "search-results"
+    );
+
+
+  if (input) {
+    input.value = "";
+  }
+
+
+  if (results) {
+    results.innerHTML = "";
+  }
 }
 
 
@@ -1442,13 +1813,32 @@ function renderMessages(messages) {
    CLEANUP
 ========================================================= */
 
-function cleanupListeners() {
+function cleanup() {
 
   state.unsubscribeMessages?.();
+
   state.unsubscribeConversations?.();
 
-  state.unsubscribeMessages = null;
-  state.unsubscribeConversations = null;
+
+  state.unsubscribeMessages =
+    null;
+
+
+  state.unsubscribeConversations =
+    null;
+
+
+  state.currentConversation =
+    null;
+
+
+  state.me =
+    null;
+
+
+  document.body.classList.remove(
+    "chat-open"
+  );
 }
 
 
@@ -1466,60 +1856,86 @@ function showToast(
       "toast-container"
     );
 
-  if (!container) return;
+
+  if (!container) {
+    return;
+  }
 
 
   const toast =
-    document.createElement("div");
+    document.createElement(
+      "div"
+    );
+
 
   toast.className =
     `toast ${type}`;
 
+
   toast.textContent =
     message;
 
-  container.appendChild(toast);
+
+  container.appendChild(
+    toast
+  );
 
 
-  setTimeout(() => {
-    toast.remove();
-  }, 3500);
+  setTimeout(
+    () => {
+      toast.remove();
+    },
+    3500
+  );
 }
 
 
 /* =========================================================
-   FIREBASE ERRORS
+   FIREBASE AUTH ERRORS
 ========================================================= */
 
-function getAuthError(error) {
+function getAuthError(
+  error
+) {
 
-  switch (error?.code) {
+  switch (
+    error?.code
+  ) {
 
     case "auth/invalid-email":
       return "Invalid email address.";
 
+
     case "auth/user-not-found":
       return "Account not found.";
+
 
     case "auth/wrong-password":
     case "auth/invalid-credential":
       return "Incorrect email or password.";
 
+
     case "auth/email-already-in-use":
       return "This email is already registered.";
+
 
     case "auth/weak-password":
       return "Password is too weak.";
 
+
     case "auth/too-many-requests":
       return "Too many login attempts.";
+
 
     case "auth/network-request-failed":
       return "Network error.";
 
+
     default:
-      return error?.message ||
-        "Authentication failed.";
+      return (
+        error?.message ||
+        "Authentication failed."
+      );
   }
 }
 
@@ -1528,26 +1944,51 @@ function getAuthError(error) {
    HELPERS
 ========================================================= */
 
-function getInitial(value) {
+function getInitial(
+  value
+) {
 
   const text =
-    String(value || "?").trim();
+    String(
+      value || "?"
+    ).trim();
+
 
   return (
-    text.charAt(0).toUpperCase() ||
+    text.charAt(0)
+      .toUpperCase() ||
     "?"
   );
 }
 
 
-function escapeHTML(value) {
+function escapeHTML(
+  value
+) {
 
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+  return String(
+    value ?? ""
+  )
+    .replaceAll(
+      "&",
+      "&amp;"
+    )
+    .replaceAll(
+      "<",
+      "&lt;"
+    )
+    .replaceAll(
+      ">",
+      "&gt;"
+    )
+    .replaceAll(
+      '"',
+      "&quot;"
+    )
+    .replaceAll(
+      "'",
+      "&#039;"
+    );
 }
 
 
@@ -1555,16 +1996,22 @@ function escapeHTML(value) {
    GLOBAL API
 ========================================================= */
 
-window.MissApp.showToast =
-  showToast;
+window.MissApp = {
 
-window.MissApp.toggleAuth =
-  toggleAuth;
+  ...window.MissApp,
 
-window.MissApp.logout =
-  handleLogout;
+  state,
 
-window.MissApp.openConversation =
-  openConversation;
+  showToast,
 
-  
+  toggleAuth,
+
+  logout:
+    handleLogout,
+
+  openChat,
+
+  sendMessage,
+
+  clearSearch
+};
