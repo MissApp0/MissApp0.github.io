@@ -4,7 +4,6 @@
 ========================================================= */
 
 @media screen and (max-width: 1024px) {
-
   :root {
     --sidebar-width: 280px;
   }
@@ -19,9 +18,7 @@
   }
 }
 
-
 @media screen and (max-width: 768px) {
-
   :root {
     --sidebar-width: 300px;
   }
@@ -29,6 +26,7 @@
   #app {
     width: 100%;
     height: 100dvh;
+    height: 100vh;
   }
 
   .message,
@@ -37,17 +35,15 @@
   }
 }
 
-
 @media screen and (max-width: 480px) {
-
   :root {
     --sidebar-width: min(320px, 88vw);
   }
 
   #toast-container {
-    right: 10px;
-    left: 10px;
-    bottom: 10px;
+    right: max(10px, env(safe-area-inset-right));
+    left: max(10px, env(safe-area-inset-left));
+    bottom: max(10px, env(safe-area-inset-bottom));
   }
 
   .toast {
