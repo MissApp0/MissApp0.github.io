@@ -1,92 +1,75 @@
-/* ================================
-   Responsive
-================================ */
-
-@media (max-width: 800px) {
-
-  :root {
-    --sidebar-width: 280px;
+/* ==========================================
+   Tablet & Medium Screen Adjustments
+   ========================================== */
+@media screen and (max-width: 1024px) {
+  /* Main app container should fill viewport cleanly */
+  #app {
+    display: flex;
+    flex-direction: row;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh; /* Dynamic viewport height for tablet mobile browsers */
+    overflow: hidden;
   }
 
+  /* Sidebar behavior on tablet: collapsible or narrower */
   #sidebar {
-    width: var(--sidebar-width);
-    min-width: var(--sidebar-width);
+    width: 260px;
+    min-width: 260px;
+    flex-shrink: 0;
+    transition: transform 0.3s ease;
   }
 
-  .message {
-    max-width: 82%;
+  /* Main chat area flexes to consume remaining space */
+  #chat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0; /* Prevents flex children from overflowing horizontally */
+    height: 100%;
   }
 
+  /* Prevent chat messages container from overflowing */
+  .chat-messages,
+  #chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Input area stays grounded at the bottom */
+  .chat-input-container,
+  #chat-input-form {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.75rem 1rem;
+  }
 }
 
-@media (max-width: 600px) {
+/* Portable Small Tablet / Portrait Mode (max-width: 768px) */
+@media screen and (max-width: 768px) {
+  #app {
+    position: relative;
+  }
 
-  /*
-     Mobile layout:
-     show either sidebar OR chat.
-  */
-
+  /* Overlay sidebar for portrait tablets */
   #sidebar {
-    width: 100%;
-    min-width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    z-index: 100;
+    transform: translateX(-100%); /* Hide off-screen by default */
+  }
+
+  /* Toggle class when sidebar is opened on smaller tablets */
+  #sidebar.active,
+  #sidebar.open {
+    transform: translateX(0);
   }
 
   #chat {
     width: 100%;
   }
-
-  body.chat-open #sidebar {
-    display: none;
-  }
-
-  body.chat-open #chat {
-    display: flex;
-  }
-
-  body:not(.chat-open) #chat {
-    display: none;
-  }
-
-  .chat-header {
-    min-height: 60px;
-
-    padding: 10px 14px;
-  }
-
-  #messages {
-    padding: 14px;
-  }
-
-  .chat-composer {
-    padding: 10px;
-  }
-
-  .message {
-    max-width: 88%;
-  }
-
-}
-
-/* ================================
-   Small phones
-================================ */
-
-@media (max-width: 400px) {
-
-  .auth-card {
-    padding: 22px;
-  }
-
-  #messages {
-    padding: 10px;
-  }
-
-  .message {
-    max-width: 92%;
-  }
-
-  .conversation {
-    padding: 11px 12px;
-  }
-
 }
