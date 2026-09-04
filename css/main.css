@@ -232,8 +232,8 @@ a {
 
   z-index: 9999;
 
-  right: 20px;
-  bottom: 20px;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: max(20px, env(safe-area-inset-bottom));
 
   display: flex;
   flex-direction: column;
@@ -260,6 +260,7 @@ a {
   box-shadow: var(--shadow);
 
   backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
 
   pointer-events: auto;
 
@@ -284,5 +285,46 @@ a {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* =========================================================
+   TABLET & MOBILE SAFE AREA ADAPTATIONS
+========================================================= */
+
+@media screen and (max-width: 1024px) {
+  :root {
+    --sidebar-width: 300px;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  html,
+  body {
+    height: 100%;
+    height: 100dvh;
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+  }
+
+  #toast-container {
+    left: max(16px, env(safe-area-inset-left));
+    right: max(16px, env(safe-area-inset-right));
+    bottom: max(16px, env(safe-area-inset-bottom));
+    align-items: center;
+  }
+
+  .toast {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  button,
+  .btn,
+  .input {
+    min-height: 44px;
   }
 }
