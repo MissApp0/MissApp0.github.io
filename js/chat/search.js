@@ -1,3 +1,8 @@
+/* =========================================================
+   MissApp
+   js/chat/search.js
+========================================================= */
+
 import {
   collection,
   query,
@@ -11,48 +16,59 @@ import {
 import { db } from "../firebase.js";
 
 
-export async function searchUsers(term) {
+export async function searchUsers(
+  term
+) {
 
-  const key =
-    String(term || "")
+  const cleanTerm =
+    String(
+      term || ""
+    )
       .trim()
       .toLowerCase();
 
 
-  if (!key) {
+  if (!cleanTerm) {
     return [];
   }
 
 
-  const q = query(
-    collection(db, "users"),
-    where("key", ">=", key),
-    where("key", "<=", key + "\uf8ff"),
-    orderBy("key"),
-    limit(8)
-  );
+  const q =
+    query(
+      collection(
+        db,
+        "users"
+      ),
+
+      where(
+        "key",
+        ">=",
+        cleanTerm
+      ),
+
+      where(
+        "key",
+        "<=",
+        cleanTerm + "\uf8ff"
+      ),
+
+      orderBy(
+        "key"
+      ),
+
+      limit(8)
+    );
 
 
   const snapshot =
     await getDocs(q);
 
 
-  return snapshot.docs.map(userDoc => {
-
-    const data =
-      userDoc.data();
-
-    return {
-      id: userDoc.id,
-      uid: data.uid || userDoc.id,
-      email: data.email || "",
-      displayName:
-        data.displayName ||
-        data.email?.split("@")[0] ||
-        "User",
-      key: data.key || ""
-    };
-
-  });
+  return snapshot.docs.map(
+    item => ({
+      id: item.id,
+      ...item.data()
+    })
+  );
 
 }
