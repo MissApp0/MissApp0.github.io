@@ -9,6 +9,7 @@
 #app {
   width: 100%;
   height: 100dvh;
+  height: 100vh; /* Fallback for older browsers */
 
   display: flex;
 
@@ -694,8 +695,6 @@
   gap: 9px;
 
   margin: 0;
-
-  /* Removed max-width: 1000px */
 }
 
 /* =========================================================
@@ -899,11 +898,17 @@
 }
 
 /* =========================================================
-   TABLET
+   TABLET / IPAD VIEWPORTS
 ========================================================= */
 
-@media screen and (max-width: 900px) {
+@media screen and (max-width: 1024px) {
+  #sidebar {
+    width: 280px;
+    min-width: 280px;
+  }
+}
 
+@media screen and (max-width: 900px) {
   .message,
   .message-bubble {
     max-width: 76%;
@@ -920,7 +925,6 @@
 ========================================================= */
 
 @media screen and (max-width: 768px) {
-
   #app {
     position: relative;
   }
@@ -1013,7 +1017,6 @@
 ========================================================= */
 
 @media screen and (max-width: 480px) {
-
   .conversation-avatar {
     width: 42px;
     height: 42px;
@@ -1063,7 +1066,6 @@
 ========================================================= */
 
 @media screen and (max-width: 360px) {
-
   .conversation,
   .conversation-item {
     gap: 9px;
@@ -1107,7 +1109,6 @@ textarea:focus-visible {
 ========================================================= */
 
 @media (prefers-reduced-motion: reduce) {
-
   *,
   *::before,
   *::after {
