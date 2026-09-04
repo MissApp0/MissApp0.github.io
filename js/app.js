@@ -603,9 +603,11 @@ function setupAuth() {
       renderMyProfile();
 
       state.unsubscribeConversations =
-        listenConversations(
-          renderConversations
-        );
+       listenConversations(
+  state.me,
+  renderConversations
+);
+
 
     } catch (error) {
 
