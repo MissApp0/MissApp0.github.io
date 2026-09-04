@@ -1,75 +1,57 @@
-/* ==========================================
-   Tablet & Medium Screen Adjustments
-   ========================================== */
+/* =========================================================
+   MissApp
+   Responsive
+========================================================= */
+
 @media screen and (max-width: 1024px) {
-  /* Main app container should fill viewport cleanly */
-  #app {
-    display: flex;
-    flex-direction: row;
-    width: 100vw;
-    height: 100vh;
-    height: 100dvh; /* Dynamic viewport height for tablet mobile browsers */
-    overflow: hidden;
+
+  :root {
+    --sidebar-width: 280px;
   }
 
-  /* Sidebar behavior on tablet: collapsible or narrower */
-  #sidebar {
-    width: 260px;
-    min-width: 260px;
-    flex-shrink: 0;
-    transition: transform 0.3s ease;
+  .message,
+  .message-bubble {
+    max-width: 80%;
   }
 
-  /* Main chat area flexes to consume remaining space */
-  #chat {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0; /* Prevents flex children from overflowing horizontally */
-    height: 100%;
-  }
-
-  /* Prevent chat messages container from overflowing */
-  .chat-messages,
-  #chat-messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1rem;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  /* Input area stays grounded at the bottom */
-  .chat-input-container,
-  #chat-input-form {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 0.75rem 1rem;
+  #messages {
+    padding: 16px;
   }
 }
 
-/* Portable Small Tablet / Portrait Mode (max-width: 768px) */
+
 @media screen and (max-width: 768px) {
+
+  :root {
+    --sidebar-width: 300px;
+  }
+
   #app {
-    position: relative;
-  }
-
-  /* Overlay sidebar for portrait tablets */
-  #sidebar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    z-index: 100;
-    transform: translateX(-100%); /* Hide off-screen by default */
-  }
-
-  /* Toggle class when sidebar is opened on smaller tablets */
-  #sidebar.active,
-  #sidebar.open {
-    transform: translateX(0);
-  }
-
-  #chat {
     width: 100%;
+    height: 100dvh;
+  }
+
+  .message,
+  .message-bubble {
+    max-width: 88%;
+  }
+}
+
+
+@media screen and (max-width: 480px) {
+
+  :root {
+    --sidebar-width: min(320px, 88vw);
+  }
+
+  #toast-container {
+    right: 10px;
+    left: 10px;
+    bottom: 10px;
+  }
+
+  .toast {
+    width: 100%;
+    max-width: none;
   }
 }
