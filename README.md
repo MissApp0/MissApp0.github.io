@@ -52,7 +52,7 @@ conversations/{conversationId}/messages/{messageId}
 conversations/{conversationId}/typing/{username}
 ```
 
-User profiles include `uid`, visible `username`, normalized `key`, presence (`online`, `lastSeen`), language, creation time, notification preference, and (after opt-in) FCM token. Conversations contain participant username keys and Auth UIDs for access control. Messages contain sender/receiver identifiers and display names, text, server timestamp, and read state. The conversation-list query deliberately filters by `participantUids` (the authenticated identity field) so Firestore can prove the participant-only read rule; deploy the included index after this update.
+User profiles include `uid`, visible `username`, normalized `key`, presence (`online`, `lastSeen`), language, creation time, notification preference, and (after opt-in) FCM token. Conversations contain participant username keys and Auth UIDs for access control. Messages contain sender/receiver identifiers and display names, text, server timestamp, and read state.
 
 ## Presence and notifications
 
@@ -65,7 +65,6 @@ If notification permission is denied, messages still arrive immediately through 
 - Confirm the GitHub Pages origin is allowed in Firebase Cloud Messaging settings.
 - Re-enable notifications from the bell button to refresh a token.
 - Review Firebase Functions logs with `firebase functions:log`.
-- If the app reports **Access was denied**, deploy the repository rules and indexes with `firebase deploy --only firestore:rules,firestore:indexes`, then sign out and sign in again. A new conversation is created before its subcollection listeners attach, so no-message conversations receive participant permissions immediately.
 - Invalid/expired registration tokens are automatically removed by the function.
 
 ## Local static preview (optional)
