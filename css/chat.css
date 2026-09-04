@@ -16,8 +16,8 @@
 ================================ */
 
 #sidebar {
-  width: var(--sidebar-width);
-  min-width: var(--sidebar-width);
+  width: var(--sidebar-width, 300px);
+  min-width: var(--sidebar-width, 300px);
   height: 100%;
 
   display: flex;
@@ -219,12 +219,6 @@
    MESSAGE AREA
 ================================ */
 
-/*
-   IMPORTANT:
-
-   This is the ONLY main chat scrolling area.
-*/
-
 #messages {
   flex: 1;
   min-height: 0;
@@ -239,6 +233,7 @@
   overscroll-behavior: contain;
 
   scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* WebKit scrollbar */
@@ -289,6 +284,7 @@
   background: var(--panel-light);
 
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .message-row.mine .message {
@@ -395,4 +391,65 @@
   color: var(--text);
   font-size: 20px;
   font-weight: 700;
+}
+
+/* ===================================================
+   RESPONSIVE ADJUSTMENTS (Tablets & Mobile)
+   =================================================== */
+
+/* Landscape Tablets & Medium Screens (768px to 1024px) */
+@media screen and (max-width: 1024px) {
+  #sidebar {
+    width: 220px;
+    min-width: 220px;
+  }
+
+  .message {
+    max-width: 85%;
+  }
+
+  #messages {
+    padding: 14px;
+  }
+
+  .chat-composer {
+    padding: 10px 12px;
+  }
+}
+
+/* Portrait Tablets & Mobile Devices (768px and below) */
+@media screen and (max-width: 768px) {
+  #app {
+    position: relative;
+  }
+
+  /* Converts sidebar into an off-canvas drawer */
+  #sidebar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 100;
+
+    width: 280px;
+    min-width: 280px;
+
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.4);
+    transform: translateX(-100%);
+    transition: transform 0.25s ease-in-out;
+  }
+
+  /* Add .active or .open to #sidebar using JavaScript to show it */
+  #sidebar.active,
+  #sidebar.open {
+    transform: translateX(0);
+  }
+
+  #chat {
+    width: 100%;
+  }
+
+  .message {
+    max-width: 90%;
+  }
 }
