@@ -4,171 +4,55 @@ import {
   where,
   orderBy,
   limit,
-  onSnapshot,
-  doc,
-  getDoc,
-  setDoc,
-  serverTimestamp
+  getDocs
 } from
   "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 import { db } from "../firebase.js";
-import { state } from "../state.js";
 
 
-export function conversationId(uid1, uid2) {
-  return [uid1, uid2]
-    .sort()
-    .join("_");
-}
+export async function searchUsers(term) {
+
+  const key =
+    String(term || "")
+      .trim()
+      .toLowerCase();
 
 
-/* =========================================================
-   LISTEN
-========================================================= */
-
-export function listenConversations(render) {
-
-  if (!state.me?.key) {
-    console.warn(
-      "MissApp: state.me.key is missing"
-    );
-
-    return () => {};
+  if (!key) {
+    return [];
   }
 
 
   const q = query(
-    collection(db, "conversations"),
-
-    where(
-      "participantKeys",
-      "array-contains",
-      state.me.key
-    ),
-
-    orderBy(
-      "updatedAt",
-      "desc"
-    ),
-
-    limit(50)
+    collection(db, "users"),
+    where("key", ">=", key),
+    where("key", "<=", key + "\uf8ff"),
+    orderBy("key"),
+    limit(8)
   );
 
 
-  const unsubscribe =
-    onSnapshot(
-      q,
-
-      snapshot => {
-        render(snapshot.docs);
-      },
-
-      error => {
-        console.error(
-          "Conversation listener:",
-          error
-        );
-      }
-    );
-
-
-  state.unsubscribeConversations =
-    unsubscribe;
-
-
-  return unsubscribe;
-}
-
-
-/* =========================================================
-   CREATE / GET CONVERSATION
-========================================================= */
-
-export async function getOrCreateConversation(
-  otherUser
-) {
-
-  if (!state.me) {
-    throw new Error(
-      "User is not authenticated."
-    );
-  }
-
-
-  const id =
-    conversationId(
-      state.me.uid,
-      otherUser.uid
-    );
-
-
-  const conversationRef =
-    doc(
-      db,
-      "conversations",
-      id
-    );
-
-
   const snapshot =
-    await getDoc(
-      conversationRef
-    );
+    await getDocs(q);
 
 
-  if (!snapshot.exists()) {
+  return snapshot.docs.map(userDoc => {
 
-    await setDoc(
-      conversationRef,
-      {
-        participantKeys: [
-          state.me.key,
-          otherUser.key
-        ],
+    const data =
+      userDoc.data();
 
-        participants: [
-          state.me.uid,
-          otherUser.uid
-        ],
+    return {
+      id: userDoc.id,
+      uid: data.uid || userDoc.id,
+      email: data.email || "",
+      displayName:
+        data.displayName ||
+        data.email?.split("@")[0] ||
+        "User",
+      key: data.key || ""
+    };
 
-        participantData: {
-          [state.me.uid]: {
-            uid: state.me.uid,
-            key: state.me.key,
-            displayName:
-              state.me.displayName,
-            email:
-              state.me.email
-          },
+  });
 
-          [otherUser.uid]: {
-            uid: otherUser.uid,
-            key: otherUser.key,
-            displayName:
-              otherUser.displayName ||
-              otherUser.email ||
-              "User",
-
-            email:
-              otherUser.email || ""
-          }
-        },
-
-        lastMessage: "",
-
-        createdAt:
-          serverTimestamp(),
-
-        updatedAt:
-          serverTimestamp()
-      }
-    );
-  }
-
-
-  return {
-    id,
-    otherUser
-  };
 }
