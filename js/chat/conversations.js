@@ -1,10 +1,13 @@
+/* =========================================================
+   MissApp
+   js/chat/conversations.js
+========================================================= */
+
 import {
   collection,
   query,
   where,
-  orderBy,
-  limit,
-  getDocs
+  onSnapshot
 } from
   "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
@@ -12,48 +15,87 @@ import { db } from "../firebase.js";
 import { state } from "../state.js";
 
 
-export async function searchUsers(term) {
+export function listenConversations(render) {
 
-  const key =
-    String(term || "")
-      .trim()
-      .toLowerCase();
-
-
-  if (!key) {
-    return [];
+  if (!state.user?.uid) {
+    return null;
   }
 
 
-  const q = query(
-    collection(db, "users"),
-    where("key", ">=", key),
-    where("key", "<=", key + "\uf8ff"),
-    orderBy("key"),
-    limit(8)
+  const q =
+    query(
+      collection(
+        db,
+        "conversations"
+      ),
+
+      where(
+        "participants",
+        "array-contains",
+        state.user.uid
+      )
+    );
+
+
+  return onSnapshot(
+    q,
+
+    snapshot => {
+
+      const docs =
+        [...snapshot.docs];
+
+
+      /*
+         Sort client-side.
+
+         This avoids requiring a composite
+         Firestore index immediately.
+      */
+
+      docs.sort(
+        (a, b) => {
+
+          const aData =
+            a.data();
+
+          const bData =
+            b.data();
+
+
+          const aTime =
+            aData.lastMessageAt
+              ?.toMillis?.() || 0;
+
+
+          const bTime =
+            bData.lastMessageAt
+              ?.toMillis?.() || 0;
+
+
+          return bTime - aTime;
+
+        }
+      );
+
+
+      render(docs);
+
+    },
+
+    error => {
+
+      console.error(
+        "Conversation listener error:",
+        error
+      );
+
+      window.MissApp?.showToast(
+        "Could not load conversations.",
+        "error"
+      );
+
+    }
   );
-
-
-  const snapshot =
-    await getDocs(q);
-
-
-  return snapshot.docs.map(userDoc => {
-
-    const data =
-      userDoc.data();
-
-    return {
-      id: userDoc.id,
-      uid: data.uid || userDoc.id,
-      email: data.email || "",
-      displayName:
-        data.displayName ||
-        data.email?.split("@")[0] ||
-        "User",
-      key: data.key || ""
-    };
-
-  });
 
 }
