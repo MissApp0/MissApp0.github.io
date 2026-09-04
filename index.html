@@ -1,46 +1,29 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MissApp</title>
-
-  <link rel="manifest" href="./manifest.json">
-
-  <link rel="stylesheet" href="./css/main.css">
-  <link rel="stylesheet" href="./css/auth.css">
-  <link rel="stylesheet" href="./css/chat.css">
-  <link rel="stylesheet" href="./css/responsive.css">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/auth.css">
+  <link rel="stylesheet" href="css/chat.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <!-- Load your entry-point module -->
+  <script type="module" src="js/app.js" defer></script>
 </head>
-
 <body>
 
-  <!-- AUTH -->
-  <section id="auth">
-    <!-- Login/Register UI -->
-  </section>
-
-  <!-- APP -->
-  <main id="app" class="hidden">
-
-    <aside id="sidebar">
-      <!-- Search -->
-      <!-- Conversations -->
-    </aside>
-
-    <section id="chat">
-      <!-- Chat header -->
-      <!-- Messages -->
-      <!-- Composer -->
-    </section>
-
-  </main>
-
+  <!-- Toast notification container -->
   <div id="toast-container"></div>
 
-  <!-- Firebase -->
-  <script src="js/app.js"></script>
-  
+  <!-- Auth screen container -->
+  <div id="auth"></div>
+
+  <!-- Main app interface container -->
+  <div id="app" class="hidden">
+    <aside id="sidebar" class="sidebar"></aside>
+    <main id="chat" class="chat"></main>
+  </div>
+
 </body>
 </html>
