@@ -15,7 +15,7 @@ import { auth, db } from "../firebase.js";
 
 
 export async function register(
-  displayName,
+  username,
   email,
   password
 ) {
@@ -31,23 +31,60 @@ export async function register(
     credential.user;
 
 
-  const cleanName =
-    displayName.trim();
+  const cleanUsername =
+    username.trim();
 
+
+  /*
+    Keep Firebase Authentication's
+    displayName synchronized with
+    the application's username.
+  */
 
   await updateProfile(user, {
-    displayName: cleanName
+    displayName: cleanUsername
   });
 
 
+  /*
+    Create the application user document.
+  */
+
   await setDoc(
-    doc(db, "users", user.uid),
+    doc(
+      db,
+      "users",
+      user.uid
+    ),
     {
-      uid: user.uid,
-      email: user.email || "",
-      displayName: cleanName,
-      key: cleanName.toLowerCase(),
-      createdAt: serverTimestamp()
+      uid:
+        user.uid,
+
+      email:
+        user.email || "",
+
+      username:
+        cleanUsername,
+
+      key:
+        cleanUsername
+          .trim()
+          .toLowerCase(),
+
+      language:
+        "en",
+
+      lastSeen:
+        serverTimestamp(),
+
+      notificationMode:
+        "all",
+
+      online:
+        true,
+
+      createdAt:
+        serverTimestamp()
     },
     {
       merge: true
