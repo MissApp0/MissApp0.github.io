@@ -1,313 +1,105 @@
 /* =========================================================
-   MissApp
-   Global Styles
+   MissApp — polished visual system
 ========================================================= */
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
 :root {
-  --bg: #efeae2;
-  --bg-secondary: #f0f2f5;
+  --bg: #e8edf1;
+  --bg-secondary: #f7f9fa;
   --panel: #ffffff;
   --panel-light: #ffffff;
-  --panel-hover: #f5f6f6;
-  --primary: #00a884;
-  --primary-hover: #008f72;
-  --primary-dark: #008069;
-  --text: #111b21;
+  --panel-hover: #f5f7f8;
+  --primary: #12a884;
+  --primary-hover: #0d9274;
+  --primary-dark: #087f66;
+  --text: #172126;
   --text-muted: #667781;
-  --text-soft: #8696a0;
-  --border: #e9edef;
-  --border-light: #d1d7db;
-  --danger: #ea0038;
-  --success: #00a884;
-  --sidebar-width: 420px;
-  --radius: 8px;
-  --radius-small: 8px;
-  --shadow: 0 2px 8px rgba(0,0,0,.12);
+  --text-soft: #8a9aa3;
+  --border: #e1e7ea;
+  --border-light: #cbd5da;
+  --danger: #e5484d;
+  --success: #12a884;
+  --sidebar-width: 400px;
+  --radius: 12px;
+  --radius-small: 10px;
+  --shadow: 0 10px 35px rgba(24, 39, 48, .10);
+  --shadow-soft: 0 2px 12px rgba(24, 39, 48, .07);
 }
 
-html,
-body {
-  font-family: "Segoe UI", Arial, Helvetica, sans-serif;
-  background: #d1d7db;
-  color: var(--text);
-  -webkit-font-smoothing: antialiased;
-  -webkit-tap-highlight-color: transparent;
-}
-
-html {
+html, body {
   background: var(--bg);
+  color: var(--text);
 }
 
 body {
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
-
   background:
-    radial-gradient(
-      circle at 20% 0%,
-      rgba(7, 143, 211, 0.07),
-      transparent 35%
-    ),
+    radial-gradient(circle at 0% 0%, rgba(18,168,132,.10), transparent 28rem),
+    radial-gradient(circle at 100% 100%, rgba(83,126,255,.07), transparent 30rem),
     var(--bg);
-
-  color: var(--text);
-
-  -webkit-font-smoothing: antialiased;
-  -webkit-tap-highlight-color: transparent;
 }
 
-button,
-input,
-textarea {
+button, input, textarea, select {
   font: inherit;
 }
 
 button {
-  border: 0;
-  cursor: pointer;
+  transition: transform .16s ease, background .16s ease, border-color .16s ease,
+    box-shadow .16s ease, opacity .16s ease;
 }
 
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
+button:active {
+  transform: scale(.97);
 }
-
-input, textarea { outline: none; }
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.hidden {
-  display: none !important;
-}
-
-/* =========================================================
-   BUTTON
-========================================================= */
 
 .btn {
-  min-height: 44px;
-
-  padding: 0 17px;
-
-  border: 1px solid transparent;
-  border-radius: var(--radius-small);
-
-  background:
-    linear-gradient(
-      135deg,
-      var(--primary),
-      var(--primary-dark)
-    );
-
-  color: white;
-
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  box-shadow: 0 7px 18px rgba(18,168,132,.20);
   font-weight: 700;
-
-  box-shadow:
-    0 8px 20px rgba(7, 143, 211, 0.18);
-
-  transition:
-    transform 0.15s ease,
-    background 0.15s ease,
-    box-shadow 0.15s ease;
 }
 
 .btn:hover {
-  background:
-    linear-gradient(
-      135deg,
-      var(--primary-hover),
-      var(--primary)
-    );
-
-  box-shadow:
-    0 10px 25px rgba(7, 143, 211, 0.28);
+  background: linear-gradient(135deg, var(--primary-hover), var(--primary-dark));
+  box-shadow: 0 9px 24px rgba(18,168,132,.26);
+  transform: translateY(-1px);
 }
-
-.btn:active {
-  transform: scale(0.98);
-}
-
-/* =========================================================
-   INPUT
-========================================================= */
 
 .input {
-  width: 100%;
   min-height: 44px;
-
-  padding: 0 14px;
-
   border: 1px solid var(--border);
-  border-radius: var(--radius-small);
-
-  background: rgba(16, 31, 48, 0.9);
+  border-radius: 11px;
+  background: var(--panel);
   color: var(--text);
-
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-.input::placeholder {
-  color: var(--text-muted);
-}
-
-.input:hover {
-  border-color: var(--border-light);
+  box-shadow: var(--shadow-soft);
 }
 
 .input:focus {
-  border-color: rgba(7, 143, 211, 0.7);
-
-  background: var(--panel);
-
-  box-shadow:
-    0 0 0 3px rgba(7, 143, 211, 0.1);
+  border-color: rgba(18,168,132,.55);
+  box-shadow: 0 0 0 4px rgba(18,168,132,.10);
 }
-
-/* =========================================================
-   SCROLLBARS
-========================================================= */
 
 * {
-  scrollbar-width: thin;
-  scrollbar-color:
-    rgba(255, 255, 255, 0.16)
-    transparent;
-}
-
-*::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
-}
-
-*::-webkit-scrollbar-track {
-  background: transparent;
+  scrollbar-color: rgba(82, 101, 112, .25) transparent;
 }
 
 *::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14);
-  border-radius: 999px;
+  background: rgba(82,101,112,.22);
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.23);
+  background: rgba(82,101,112,.35);
 }
 
-/* =========================================================
-   TOASTS
-========================================================= */
-
 #toast-container {
-  position: fixed;
-  z-index: 9999;
-  right: 20px;
-  bottom: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  pointer-events: none;
+  right: 22px;
+  bottom: 22px;
 }
 
 .toast {
-  min-width: 220px;
-  max-width: 360px;
-
-  padding: 13px 16px;
-
-  border: 1px solid var(--border);
-  border-radius: 12px;
-
-  background:
-    rgba(22, 42, 61, 0.96);
-
-  color: var(--text);
-
-  box-shadow: var(--shadow);
-
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
-
-  pointer-events: auto;
-
-  animation:
-    toast-in 0.2s ease;
-}
-
-.toast.error {
-  border-color: rgba(239, 68, 68, 0.35);
-}
-
-.toast.success {
-  border-color: rgba(34, 197, 94, 0.35);
-}
-
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* =========================================================
-   TABLET & MOBILE SAFE AREA ADAPTATIONS
-========================================================= */
-
-@media screen and (max-width: 1024px) {
-  :root {
-    --sidebar-width: 300px;
-  }
-}
-
-@media screen and (max-width: 768px) {
-  html,
-  body {
-    height: 100%;
-    height: 100dvh;
-    overflow: hidden;
-    position: fixed;
-    width: 100%;
-  }
-
-  #toast-container {
-    left: max(16px, env(safe-area-inset-left));
-    right: max(16px, env(safe-area-inset-right));
-    bottom: max(16px, env(safe-area-inset-bottom));
-    align-items: center;
-  }
-
-  .toast {
-    width: 100%;
-    max-width: 100%;
-  }
-}
-
-@media (hover: none) and (pointer: coarse) {
-  button,
-  .btn,
-  .input {
-    min-height: 44px;
-  }
+  border: 1px solid rgba(255,255,255,.55);
+  border-radius: 14px;
+  background: rgba(25, 39, 46, .94);
+  box-shadow: 0 14px 35px rgba(0,0,0,.18);
+  color: #fff;
 }
