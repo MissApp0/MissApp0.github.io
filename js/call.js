@@ -1,0 +1,379 @@
+import { auth, db } from "./firebase.js";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+  updateDoc
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+const rtcConfig = {
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" }
+  ]
+};
+
+let activeCall = null;
+let incomingUnsubscribe = null;
+
+export function initCalls() {
+  if (!auth.currentUser) return;
+  listenForIncomingCalls();
+}
+
+function listenForIncomingCalls() {
+  incomingUnsubscribe?.();
+
+  const callsRef = collection(db, "calls");
+
+  incomingUnsubscribe = onSnapshot(callsRef, snapshot => {
+    snapshot.docChanges().forEach(change => {
+      if (change.type !== "added" && change.type !== "modified") return;
+
+      const call = { id: change.doc.id, ...change.doc.data() };
+
+      if (
+        call.callee === auth.currentUser?.uid &&
+        call.status === "ringing" &&
+        !activeCall
+      ) {
+        showIncomingCall(call);
+      }
+    });
+  }, error => {
+    console.error("Incoming call listener error:", error);
+  });
+}
+
+export async function startCall({ calleeId, calleeName, video = false }) {
+  if (!auth.currentUser || !calleeId) return;
+
+  if (activeCall) {
+    throw new Error("A call is already active.");
+  }
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error("Camera and microphone are not available in this browser.");
+  }
+
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: true,
+    video
+  });
+
+  const peer = new RTCPeerConnection(rtcConfig);
+  stream.getTracks().forEach(track => peer.addTrack(track, stream));
+
+  const callRef = doc(collection(db, "calls"));
+  const caller = auth.currentUser.uid;
+
+  const call = {
+    id: callRef.id,
+    caller,
+    callee: calleeId,
+    callerName: auth.currentUser.displayName || auth.currentUser.email?.split("@")[0] || "User",
+    calleeName: calleeName || "User",
+    type: video ? "video" : "voice",
+    status: "ringing",
+    createdAt: serverTimestamp()
+  };
+
+  const remoteStream = new MediaStream();
+
+  peer.ontrack = event => {
+    event.streams[0]?.getTracks().forEach(track => remoteStream.addTrack(track));
+    attachRemoteStream(remoteStream);
+  };
+
+  peer.onicecandidate = async event => {
+    if (!event.candidate) return;
+    await addDoc(collection(db, "calls", callRef.id, "callerCandidates"), event.candidate.toJSON());
+  };
+
+  await setDoc(callRef, call);
+
+  const offer = await peer.createOffer();
+  await peer.setLocalDescription(offer);
+  await updateDoc(callRef, { offer: { type: offer.type, sdp: offer.sdp } });
+
+  activeCall = {
+    ...call,
+    peer,
+    stream,
+    remoteStream,
+    role: "caller",
+    unsubscribers: []
+  };
+
+  listenForAnswer(callRef.id, peer);
+  listenForCalleeCandidates(callRef.id, peer);
+
+  showCallScreen(activeCall);
+}
+
+async function answerCall(call) {
+  if (!auth.currentUser || activeCall) return;
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error("Camera and microphone are not available in this browser.");
+  }
+
+  const video = call.type === "video";
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: true,
+    video
+  });
+
+  const peer = new RTCPeerConnection(rtcConfig);
+  stream.getTracks().forEach(track => peer.addTrack(track, stream));
+
+  const remoteStream = new MediaStream();
+
+  peer.ontrack = event => {
+    event.streams[0]?.getTracks().forEach(track => remoteStream.addTrack(track));
+    attachRemoteStream(remoteStream);
+  };
+
+  peer.onicecandidate = async event => {
+    if (!event.candidate) return;
+    await addDoc(collection(db, "calls", call.id, "calleeCandidates"), event.candidate.toJSON());
+  };
+
+  const callRef = doc(db, "calls", call.id);
+  const snapshot = await getDoc(callRef);
+
+  if (!snapshot.exists()) {
+    stream.getTracks().forEach(track => track.stop());
+    peer.close();
+    throw new Error("This call is no longer available.");
+  }
+
+  const data = snapshot.data();
+
+  await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
+
+  const answer = await peer.createAnswer();
+  await peer.setLocalDescription(answer);
+
+  await updateDoc(callRef, {
+    answer: { type: answer.type, sdp: answer.sdp },
+    status: "connected"
+  });
+
+  activeCall = {
+    ...call,
+    peer,
+    stream,
+    remoteStream,
+    role: "callee",
+    unsubscribers: []
+  };
+
+  listenForCallerCandidates(call.id, peer);
+  listenForCallState(call.id);
+
+  showCallScreen(activeCall);
+}
+
+function listenForAnswer(callId, peer) {
+  const unsub = onSnapshot(doc(db, "calls", callId), async snapshot => {
+    const data = snapshot.data();
+    if (!data || !data.answer || peer.currentRemoteDescription) return;
+
+    try {
+      await peer.setRemoteDescription(new RTCSessionDescription(data.answer));
+      await updateDoc(doc(db, "calls", callId), { status: "connected" });
+    } catch (error) {
+      console.error("Set remote answer error:", error);
+    }
+  });
+
+  activeCall?.unsubscribers.push(unsub);
+}
+
+function listenForCallState(callId) {
+  const unsub = onSnapshot(doc(db, "calls", callId), snapshot => {
+    const data = snapshot.data();
+    if (!data || data.status === "ended" || data.status === "declined") {
+      endActiveCall(false);
+    }
+  });
+
+  activeCall?.unsubscribers.push(unsub);
+}
+
+function listenForCalleeCandidates(callId, peer) {
+  const unsub = onSnapshot(collection(db, "calls", callId, "calleeCandidates"), snapshot => {
+    snapshot.docChanges().forEach(change => {
+      if (change.type === "added") {
+        peer.addIceCandidate(new RTCIceCandidate(change.doc.data())).catch(console.error);
+      }
+    });
+  });
+
+  activeCall?.unsubscribers.push(unsub);
+}
+
+function listenForCallerCandidates(callId, peer) {
+  const unsub = onSnapshot(collection(db, "calls", callId, "callerCandidates"), snapshot => {
+    snapshot.docChanges().forEach(change => {
+      if (change.type === "added") {
+        peer.addIceCandidate(new RTCIceCandidate(change.doc.data())).catch(console.error);
+      }
+    });
+  });
+
+  activeCall?.unsubscribers.push(unsub);
+}
+
+export async function declineCall(callId) {
+  try {
+    await updateDoc(doc(db, "calls", callId), {
+      status: "declined",
+      endedAt: serverTimestamp()
+    });
+  } finally {
+    hideIncomingCall();
+  }
+}
+
+export async function endActiveCall(notify = true) {
+  const call = activeCall;
+  if (!call) return;
+
+  activeCall = null;
+
+  if (notify) {
+    try {
+      await updateDoc(doc(db, "calls", call.id), {
+        status: "ended",
+        endedAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error("End call update error:", error);
+    }
+  }
+
+  call.unsubscribers?.forEach(unsub => unsub());
+
+  call.stream?.getTracks().forEach(track => track.stop());
+  call.remoteStream?.getTracks().forEach(track => track.stop());
+  call.peer?.close();
+
+  hideCallScreen();
+}
+
+function showIncomingCall(call) {
+  const existing = document.getElementById("incoming-call");
+  if (existing) existing.remove();
+
+  const modal = document.createElement("div");
+  modal.id = "incoming-call";
+  modal.className = "call-modal";
+  modal.innerHTML = `
+    <div class="incoming-call-card">
+      <div class="call-avatar">${escapeHtml((call.callerName || "U").charAt(0).toUpperCase())}</div>
+      <div class="incoming-call-name">${escapeHtml(call.callerName || "User")}</div>
+      <div class="incoming-call-type">${call.type === "video" ? "Incoming video call" : "Incoming voice call"}</div>
+      <div class="incoming-call-actions">
+        <button class="call-action decline" id="decline-call">✕</button>
+        <button class="call-action accept" id="accept-call">✓</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  modal.querySelector("#decline-call").addEventListener("click", () => declineCall(call.id));
+  modal.querySelector("#accept-call").addEventListener("click", async () => {
+    modal.remove();
+    try {
+      await answerCall(call);
+    } catch (error) {
+      console.error("Answer call error:", error);
+      alert(error.message || "Could not answer the call.");
+      await declineCall(call.id);
+    }
+  });
+}
+
+function showCallScreen(call) {
+  hideIncomingCall();
+
+  let screen = document.getElementById("active-call");
+  if (screen) screen.remove();
+
+  screen = document.createElement("div");
+  screen.id = "active-call";
+  screen.className = "active-call";
+  screen.innerHTML = `
+    <video id="remote-video" class="remote-video" autoplay playsinline></video>
+    <div class="call-topbar">
+      <div class="call-name">${escapeHtml(call.role === "caller" ? call.calleeName : call.callerName)}</div>
+      <div class="call-status" id="call-status">Calling…</div>
+    </div>
+    <video id="local-video" class="local-video" autoplay muted playsinline></video>
+    <div class="call-controls">
+      <button id="toggle-mic" class="call-control" title="Mute microphone">🎙</button>
+      ${call.type === "video" ? '<button id="toggle-camera" class="call-control" title="Camera">📹</button>' : ""}
+      <button id="end-call" class="call-control end" title="End call">☎</button>
+    </div>
+  `;
+
+  document.body.appendChild(screen);
+
+  const localVideo = screen.querySelector("#local-video");
+  const remoteVideo = screen.querySelector("#remote-video");
+  localVideo.srcObject = call.stream;
+  remoteVideo.srcObject = call.remoteStream;
+
+  screen.querySelector("#end-call").addEventListener("click", () => endActiveCall(true));
+
+  screen.querySelector("#toggle-mic").addEventListener("click", event => {
+    const track = call.stream.getAudioTracks()[0];
+    if (!track) return;
+    track.enabled = !track.enabled;
+    event.currentTarget.classList.toggle("off", !track.enabled);
+  });
+
+  screen.querySelector("#toggle-camera")?.addEventListener("click", event => {
+    const track = call.stream.getVideoTracks()[0];
+    if (!track) return;
+    track.enabled = !track.enabled;
+    event.currentTarget.classList.toggle("off", !track.enabled);
+  });
+}
+
+function attachRemoteStream(stream) {
+  const video = document.getElementById("remote-video");
+  if (video) video.srcObject = stream;
+}
+
+function hideIncomingCall() {
+  document.getElementById("incoming-call")?.remove();
+}
+
+function hideCallScreen() {
+  document.getElementById("active-call")?.remove();
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+window.MissAppCalls = {
+  startCall,
+  answerCall,
+  declineCall,
+  endActiveCall
+};
