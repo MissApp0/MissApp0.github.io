@@ -170,6 +170,11 @@ function createAppUI() {
         <div id="chat-name" class="chat-header-name">Select a conversation</div>
         <div id="chat-status" class="chat-header-status">Choose someone to start chatting</div>
       </div>
+
+      <div class="chat-call-actions">
+        <button id="voice-call-button" class="chat-call-button" type="button" aria-label="Voice call" title="Voice call">☎</button>
+        <button id="video-call-button" class="chat-call-button" type="button" aria-label="Video call" title="Video call">▣</button>
+      </div>
     </header>
 
     <div id="messages" class="messages">
@@ -205,6 +210,8 @@ function setupEvents() {
   document.getElementById("open-sidebar")?.addEventListener("click", openSidebar);
   document.getElementById("close-sidebar")?.addEventListener("click", closeSidebar);
   document.getElementById("back-button")?.addEventListener("click", handleBack);
+  document.getElementById("voice-call-button")?.addEventListener("click", () => beginCall(false));
+  document.getElementById("video-call-button")?.addEventListener("click", () => beginCall(true));
 
   const composer = document.getElementById("composer-form");
   const input = document.getElementById("message-input");
@@ -245,6 +252,7 @@ function setupAuth() {
       await ensureUserDocument(user);
       await loadCurrentUser(user);
       startConversationListener();
+      initCalls();
     } catch (error) {
       console.error("Application startup error:", error);
       showToast("Could not initialize your account.", "error");
@@ -773,6 +781,25 @@ function openConversation(item) {
   closeSidebar();
 }
 
+async function beginCall(video) {
+  const other = state.currentConversation?.otherUser;
+  if (!other?.uid) {
+    showToast("Open a conversation first.", "error");
+    return;
+  }
+
+  try {
+    await startCall({
+      calleeId: other.uid,
+      calleeName: other.username || other.displayName || other.email || "User",
+      video
+    });
+  } catch (error) {
+    console.error("Start call error:", error);
+    showToast(error?.message || "Could not start the call.", "error");
+  }
+}
+
 function updateChatHeader(user) {
   const name = document.getElementById("chat-name");
   const status = document.getElementById("chat-status");
@@ -793,6 +820,9 @@ function updateChatHeader(user) {
       user.email ||
       "MissApp user";
   }
+
+  document.getElementById("voice-call-button")?.removeAttribute("disabled");
+  document.getElementById("video-call-button")?.removeAttribute("disabled");
 
   if (avatar) {
     avatar.textContent =
@@ -1241,6 +1271,9 @@ function cleanup() {
 
   disableComposer();
   closeSearch();
+  document.getElementById("voice-call-button")?.setAttribute("disabled", "");
+  document.getElementById("video-call-button")?.setAttribute("disabled", "");
+  endActiveCall(false);
 }
 
 function showToast(
