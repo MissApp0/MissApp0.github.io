@@ -217,3 +217,72 @@ button:active {
 @media (max-width: 600px) {
   #incoming-notifications { top: 8px; width: calc(100vw - 16px); }
 }
+
+
+/* Realtime connection health */
+#connection-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: min(440px, calc(100vw - 24px));
+  min-height: 42px;
+  padding: 8px 10px 8px 13px;
+  border: 1px solid rgba(18, 168, 132, .22);
+  border-radius: 14px;
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 12px 32px rgba(20,35,42,.16);
+  color: var(--text);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -14px);
+  transition: opacity .2s ease, transform .2s ease;
+  backdrop-filter: blur(14px);
+}
+#connection-banner.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+#connection-banner.offline {
+  border-color: rgba(229,72,77,.28);
+}
+#connection-dot {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 9px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 4px rgba(18,168,132,.10);
+}
+#connection-banner.offline #connection-dot {
+  background: var(--danger);
+  box-shadow: 0 0 0 4px rgba(229,72,77,.10);
+}
+#connection-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+#connection-retry {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 9px;
+  background: rgba(18,168,132,.10);
+  color: var(--primary-dark);
+  font-size: 12px;
+  font-weight: 800;
+}
+#connection-retry:hover {
+  background: rgba(18,168,132,.17);
+}
+@media (max-width: 600px) {
+  #connection-banner {
+    top: 8px;
+    width: calc(100vw - 16px);
+  }
+}
