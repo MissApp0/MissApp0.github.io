@@ -148,6 +148,10 @@
   border-top:1px solid #e9edef;
   background:#f0f2f5;
 }
+.sidebar-footer-actions { display:flex; gap:8px; align-items:center; }
+.sidebar-footer-actions .btn { flex:1; }
+.sidebar-footer .btn.secondary { background:#fff; color:#111b21; border-color:#d1d7db; box-shadow:none; }
+.sidebar-footer .btn.secondary:hover { background:#f5f6f6; }
 .sidebar-footer .btn {
   width:auto;
   min-height:36px;
