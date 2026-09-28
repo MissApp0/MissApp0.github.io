@@ -60,6 +60,7 @@ function attachPeerMonitoring(peer, call) {
 
     if (peer.connectionState === "connected") {
       if (status) status.textContent = "Connected";
+      logSelectedIceRoute(peer);
       return;
     }
 
@@ -102,6 +103,14 @@ function attachPeerMonitoring(peer, call) {
 
   peer.onicegatheringstatechange = () => {
     console.log("MissApp ICE gathering:", peer.iceGatheringState);
+  };
+
+  peer.onicecandidateerror = event => {
+    console.warn("MissApp ICE candidate error:", {
+      url: event.url,
+      errorCode: event.errorCode,
+      errorText: event.errorText
+    });
   };
 }
 
@@ -508,6 +517,40 @@ function hideIncomingCall() {
 
 function hideCallScreen() {
   document.getElementById("active-call")?.remove();
+}
+
+async function logSelectedIceRoute(peer) {
+  try {
+    const stats = await peer.getStats();
+    let selectedPair = null;
+    const candidates = new Map();
+
+    stats.forEach(report => {
+      if (report.type === "candidate-pair" &&
+          report.state === "succeeded" &&
+          (report.nominated || report.selected)) {
+        selectedPair = report;
+      }
+
+      if (report.type === "local-candidate" || report.type === "remote-candidate") {
+        candidates.set(report.id, report);
+      }
+    });
+
+    if (!selectedPair) return;
+
+    const local = candidates.get(selectedPair.localCandidateId);
+    const remote = candidates.get(selectedPair.remoteCandidateId);
+
+    console.log("MissApp selected ICE route:", {
+      localType: local?.candidateType,
+      localProtocol: local?.protocol,
+      remoteType: remote?.candidateType,
+      remoteProtocol: remote?.protocol
+    });
+  } catch (error) {
+    console.debug("MissApp ICE stats unavailable:", error);
+  }
 }
 
 function getMediaError(error) {
