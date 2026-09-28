@@ -1,0 +1,80 @@
+.settings-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 11000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(11, 20, 26, .58);
+  backdrop-filter: blur(5px);
+}
+.settings-card {
+  width: min(560px, 100%);
+  max-height: min(760px, calc(100dvh - 36px));
+  overflow: auto;
+  border-radius: 18px;
+  background: #fff;
+  color: #111b21;
+  box-shadow: 0 24px 80px rgba(0,0,0,.28);
+}
+.settings-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding: 18px 20px;
+  border-bottom:1px solid #e9edef;
+}
+.settings-title { font-size:20px; font-weight:600; }
+.settings-close {
+  width:38px; height:38px; border-radius:50%; background:transparent;
+  color:#54656f; font-size:25px;
+}
+.settings-close:hover { background:#f0f2f5; }
+.settings-section { padding: 8px 20px 18px; }
+.settings-section-title {
+  padding: 14px 0 8px;
+  color:#00a884;
+  font-size:13px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.settings-row {
+  display:flex; align-items:center; gap:14px;
+  min-height:58px; padding:10px 0;
+  border-bottom:1px solid #f0f2f5;
+}
+.settings-row:last-child { border-bottom:0; }
+.settings-icon {
+  width:38px; height:38px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:#f0f2f5; color:#54656f; font-size:18px;
+}
+.settings-copy { min-width:0; flex:1; }
+.settings-label { font-size:15px; }
+.settings-description { margin-top:3px; color:#667781; font-size:12px; line-height:1.35; }
+.settings-switch {
+  width:48px; height:28px; padding:3px; border-radius:999px;
+  background:#d1d7db; transition:.18s ease;
+}
+.settings-switch::after {
+  content:""; display:block; width:22px; height:22px; border-radius:50%;
+  background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.22); transition:.18s ease;
+}
+.settings-switch.active { background:#00a884; }
+.settings-switch.active::after { transform:translateX(20px); }
+.settings-range { width:120px; accent-color:#00a884; }
+.settings-select {
+  min-height:38px; padding:0 10px; border:1px solid #d1d7db; border-radius:8px;
+  background:#fff; color:#111b21;
+}
+.settings-footer {
+  padding:14px 20px; border-top:1px solid #e9edef;
+  display:flex; justify-content:flex-end; gap:8px;
+}
+.settings-reset { min-height:38px; padding:0 14px; border-radius:8px; background:#f0f2f5; color:#111b21; }
+@media(max-width:600px) {
+  .settings-modal { padding:0; align-items:flex-end; }
+  .settings-card { width:100%; max-height:92dvh; border-radius:18px 18px 0 0; }
+}
