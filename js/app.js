@@ -1536,7 +1536,7 @@ function openSettings() {
         ${settingsRow("☎", "Incoming calls", "Incoming-call alert.", "sound-incomingCall", s.incomingCall)}
         ${settingsRow("✓", "Call connected", "Confirmation when connected.", "sound-callConnected", s.callConnected)}
       </div>
-      <div class="settings-section"><div class="settings-section-title">App</div><div class="settings-row"><div class="settings-icon">🌐</div><div class="settings-copy"><div class="settings-label">Language</div><div class="settings-description">Interface language</div></div><select class="settings-select" disabled><option>English</option></select></div></div>
+      <div class="settings-section"><div class="settings-section-title">App</div><div class="settings-row"><div class="settings-icon">🌐</div><div class="settings-copy"><div class="settings-label">Language</div><div class="settings-description">Interface language</div></div><select class="settings-select" disabled><option>English</option></select></div><div class="settings-row"><div class="settings-icon">↻</div><div class="settings-copy"><div class="settings-label">Hard refresh</div><div class="settings-description">Clear cached app resources and reload MissApp.</div></div><button id="settings-hard-refresh" class="settings-reset" type="button">Refresh</button></div></div>
       <div class="settings-footer"><button id="settings-reset" class="settings-reset" type="button">Reset sound settings</button></div>
     </div>
   `;
@@ -1551,11 +1551,55 @@ function setupSettingsEvents() {
   modal.querySelector("#settings-close")?.addEventListener("click", closeSettings);
   modal.querySelector("#settings-test-sound")?.addEventListener("click", async () => { await unlockAudio(); playSound("messageReceived"); });
   modal.querySelector("#settings-reset")?.addEventListener("click", () => { resetSoundSettings(); openSettings(); });
+  modal.querySelector("#settings-hard-refresh")?.addEventListener("click", hardRefreshApp);
   modal.querySelector("#sound-volume")?.addEventListener("input", event => updateSoundSettings({ volume: Number(event.target.value) / 100 }));
   [["sound-enabled","enabled"],["sound-messageSent","messageSent"],["sound-messageReceived","messageReceived"],["sound-incomingCall","incomingCall"],["sound-callConnected","callConnected"]].forEach(([id,key]) => {
     modal.querySelector("#"+id)?.addEventListener("click", event => { const next = !getSoundSettings()[key]; updateSoundSettings({ [key]: next }); event.currentTarget.classList.toggle("active", next); event.currentTarget.setAttribute("aria-checked", String(next)); if (next && key !== "enabled") playSound(key); });
   });
   modal.addEventListener("click", event => { if (event.target === modal) closeSettings(); });
+}
+
+async function hardRefreshApp() {
+  const button = document.getElementById("settings-hard-refresh");
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Refreshing...";
+  }
+
+  showToast("Refreshing MissApp and clearing cached resources…", "info");
+
+  try {
+    if ("caches" in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(
+        cacheNames.map(name => caches.delete(name))
+      );
+    }
+
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+
+      // Keep Firebase Messaging registered so push notifications continue
+      // working. Ask it to activate immediately when possible.
+      await Promise.all(
+        registrations.map(registration => {
+          const scriptURL = registration.active?.scriptURL || registration.scope || "";
+          if (scriptURL.includes("firebase-messaging-sw.js")) {
+            registration.waiting?.postMessage({ type: "SKIP_WAITING" });
+            return Promise.resolve();
+          }
+          return registration.unregister();
+        })
+      );
+    }
+  } catch (error) {
+    console.warn("MissApp cache cleanup failed:", error);
+  }
+
+  const url = new URL(window.location.href);
+  url.searchParams.set("missapp_refresh", Date.now().toString());
+  window.location.replace(url.toString());
 }
 
 function closeSettings() { document.getElementById("settings-modal")?.remove(); }
@@ -1646,3 +1690,4 @@ window.MissApp.logout = handleLogout;
 window.MissApp.openSidebar = openSidebar;
 window.MissApp.closeSidebar = closeSidebar;
 window.MissApp.openConversation = openConversation;
+window.MissApp.hardRefresh = hardRefreshApp;
