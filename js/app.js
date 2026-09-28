@@ -1935,32 +1935,45 @@ function setupSettingsEvents() {
   if (!modal) return;
 
   const title = modal.querySelector("#settings-title");
-  const labels = { general: "General", sounds: "Sounds & notifications", appearance: "Appearance", app: "App" };
+  const labels = {
+    general: "General",
+    sounds: "Sounds & notifications",
+    appearance: "Appearance",
+    app: "App"
+  };
+
+  const selectSettingsTab = tab => {
+    if (!tab || !labels[tab]) return;
+
+    modal.querySelectorAll(".settings-nav-item").forEach(button => {
+      const active = button.dataset.settingsTab === tab;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-selected", String(active));
+    });
+
+    modal.querySelectorAll(".settings-tab-panel").forEach(panel => {
+      const active = panel.dataset.settingsPanel === tab;
+      panel.classList.toggle("active", active);
+      panel.hidden = !active;
+    });
+
+    if (title) title.textContent = labels[tab];
+  };
 
   modal.querySelector("#settings-close")?.addEventListener("click", closeSettings);
 
-  modal.querySelectorAll(".settings-nav-item").forEach(button => {
-    button.addEventListener("click", () => {
-      const tab = button.dataset.settingsTab;
-      modal.querySelectorAll(".settings-nav-item").forEach(item => {
-        const active = item === button;
-        item.classList.toggle("active", active);
-        item.setAttribute("aria-selected", String(active));
-      });
-      modal.querySelectorAll(".settings-tab-panel").forEach(panel => {
-        const active = panel.dataset.settingsPanel === tab;
-        panel.classList.toggle("active", active);
-        panel.hidden = !active;
-      });
-      if (title) title.textContent = labels[tab] || "Settings";
-    });
+  // One delegated handler keeps navigation working even after theme-picker re-renders.
+  modal.querySelector(".settings-nav")?.addEventListener("click", event => {
+    const button = event.target.closest(".settings-nav-item");
+    if (!button || !modal.contains(button)) return;
+    event.preventDefault();
+    selectSettingsTab(button.dataset.settingsTab);
   });
 
   modal.querySelectorAll(".theme-option").forEach(button => {
     button.addEventListener("click", () => {
       setTheme(button.dataset.themeId);
       renderThemePicker();
-      setupSettingsEvents();
     });
   });
 
@@ -1968,17 +1981,21 @@ function setupSettingsEvents() {
     await unlockAudio();
     playSound("messageReceived");
   });
+
   modal.querySelector("#settings-reset")?.addEventListener("click", () => {
     resetSoundSettings();
+    closeSettings();
     openSettings();
     document.querySelector('#settings-modal [data-settings-tab="sounds"]')?.click();
   });
+
   modal.querySelector("#settings-hard-refresh")?.addEventListener("click", hardRefreshApp);
   modal.querySelector("#settings-hard-refresh-app")?.addEventListener("click", hardRefreshApp);
 
   modal.querySelector("#sound-volume")?.addEventListener("input", event => {
     updateSoundSettings({ volume: Number(event.target.value) / 100 });
   });
+
   modal.querySelector("#sound-type")?.addEventListener("change", async event => {
     updateSoundSettings({ soundType: event.target.value });
     await unlockAudio();
