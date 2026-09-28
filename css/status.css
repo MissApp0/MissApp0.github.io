@@ -154,3 +154,157 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+.status-subheading {
+  padding: 8px 6px 4px;
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.status-empty { padding: 10px 6px 14px; color: var(--text-soft); font-size: 12px; }
+.status-count {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 99px;
+  background: var(--primary);
+  color: white;
+  font-size: 10px;
+}
+.status-avatar { position: relative; }
+
+.status-composer {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(8px);
+}
+.status-composer-card {
+  width: min(520px, 100%);
+  padding: 20px;
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: 0 20px 60px rgba(0,0,0,.3);
+}
+.status-composer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.status-composer-header button {
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 28px;
+}
+.status-composer textarea {
+  width: 100%;
+  min-height: 170px;
+  resize: vertical;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-light);
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1.45;
+}
+.status-compose-meta {
+  display: flex;
+  justify-content: space-between;
+  margin: 7px 2px 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.status-colors { display: flex; gap: 9px; }
+.status-colors button {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+}
+.status-colors button[data-bg="#075e54"] { background: #075e54; }
+.status-colors button[data-bg="#6b21a8"] { background: #6b21a8; }
+.status-colors button[data-bg="#1d4ed8"] { background: #1d4ed8; }
+.status-colors button[data-bg="#b45309"] { background: #b45309; }
+.status-colors button[data-bg="#be123c"] { background: #be123c; }
+.status-colors button.active { border-color: var(--text); }
+.status-composer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+.status-secondary, .status-primary {
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+.status-secondary { background: var(--panel-hover); color: var(--text); }
+.status-primary { background: var(--primary); color: white; }
+
+.status-bars {
+  display: flex;
+  gap: 4px;
+  padding: 8px 8px 0;
+}
+.status-bars span {
+  height: 3px;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 3px;
+  background: rgba(255,255,255,.3);
+}
+.status-bars i {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: white;
+}
+.status-bars .done i { width: 100%; }
+.status-viewer-content { transition: background .2s ease; position: relative; }
+.status-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 52px;
+  height: 100px;
+  transform: translateY(-50%);
+  background: transparent;
+  color: white;
+  font-size: 60px;
+  opacity: .7;
+}
+.status-nav:hover { opacity: 1; }
+.status-prev { left: 0; }
+.status-next { right: 0; }
+.status-viewer-footer {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  color: rgba(255,255,255,.7);
+  font-size: 12px;
+}
+.status-delete {
+  padding: 9px 14px;
+  border-radius: 9px;
+  background: rgba(255,255,255,.12);
+  color: white;
+}
+@media (max-width: 600px) {
+  .status-composer { align-items: end; padding: 0; }
+  .status-composer-card { border-radius: 20px 20px 0 0; }
+}
