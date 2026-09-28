@@ -121,9 +121,10 @@ service cloud.firestore {
       allow delete: if false;
 
       match /messages/{messageId} {
-        allow read: if isParticipant(
-          get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants
-        );
+        allow read: if signedIn()
+          && isParticipant(
+            get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants
+          );
 
         allow create: if isParticipant(
           get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants
