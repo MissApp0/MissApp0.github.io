@@ -751,6 +751,9 @@ function toggleAuth() {
   const registerForm = document.getElementById("register-form");
   const text = document.getElementById("auth-switch-text");
   const button = document.getElementById("auth-switch-button");
+  const title = document.getElementById("auth-title");
+  const kicker = document.getElementById("auth-kicker");
+  const subtitle = document.getElementById("auth-subtitle");
 
   if (state.registerMode) {
     loginForm?.classList.add("hidden");
@@ -763,6 +766,10 @@ function toggleAuth() {
     if (button) {
       button.textContent = "Log in";
     }
+
+    if (kicker) kicker.textContent = "NEW TO MISSAPP";
+    if (title) title.textContent = "Create your space.";
+    if (subtitle) subtitle.textContent = "Set up your account and start connecting in seconds.";
   } else {
     registerForm?.classList.add("hidden");
     loginForm?.classList.remove("hidden");
@@ -774,6 +781,10 @@ function toggleAuth() {
     if (button) {
       button.textContent = "Create one";
     }
+
+    if (kicker) kicker.textContent = "WELCOME BACK";
+    if (title) title.textContent = "Good to see you.";
+    if (subtitle) subtitle.textContent = "Sign in to continue your conversations.";
   }
 }
 
