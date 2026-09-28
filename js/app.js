@@ -29,6 +29,10 @@ import {
   searchUsers
 } from "./chat/search.js";
 
+import {
+  createConversation
+} from "./chat/conversations.js";
+
 let unsubscribeConversations = null;
 let unsubscribeMessages = null;
 let searchTimer = null;
@@ -589,15 +593,35 @@ function renderSearchResults(users) {
 async function startConversation(otherUserId) {
   if (!state.user || !otherUserId) return;
 
-  window.dispatchEvent(
-    new CustomEvent("missapp:start-conversation", {
-      detail: {
-        otherUserId
-      }
-    })
-  );
+  try {
+    const conversation = await createConversation(otherUserId);
+    const userSnapshot = await getDoc(doc(db, "users", otherUserId));
 
-  showToast("Opening conversation...", "info");
+    if (!userSnapshot.exists()) {
+      throw new Error("User profile not found.");
+    }
+
+    const otherUser = {
+      uid: otherUserId,
+      ...userSnapshot.data()
+    };
+
+    openConversation({
+      id: conversation.id,
+      data: {
+        participants: [state.user.uid, otherUserId],
+        participantData: {
+          [state.user.uid]: state.me || {},
+          [otherUserId]: otherUser
+        }
+      }
+    });
+
+    showToast("Conversation opened.", "success");
+  } catch (error) {
+    console.error("Start conversation error:", error);
+    showToast(getFirestoreError(error), "error");
+  }
 }
 
 function startConversationListener() {
