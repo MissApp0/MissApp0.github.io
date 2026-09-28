@@ -318,3 +318,127 @@
   #messages { padding:12px 10px; }
   .message { max-width:88%; }
 }
+
+/* Calls */
+.chat-call-actions {
+  display:flex;
+  align-items:center;
+  gap:4px;
+  margin-left:auto;
+}
+.chat-call-button {
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  background:transparent;
+  color:#54656f;
+  font-size:20px;
+}
+.chat-call-button:hover:not(:disabled) { background:rgba(0,0,0,.06); }
+.chat-call-button:disabled { opacity:.35; cursor:not-allowed; }
+
+.call-modal {
+  position:fixed;
+  inset:0;
+  z-index:10000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(11,20,26,.72);
+  backdrop-filter:blur(5px);
+}
+.incoming-call-card {
+  width:min(360px, calc(100vw - 32px));
+  padding:32px 24px 24px;
+  border-radius:18px;
+  background:#fff;
+  text-align:center;
+  box-shadow:0 20px 60px rgba(0,0,0,.3);
+}
+.call-avatar {
+  width:82px;
+  height:82px;
+  margin:0 auto 16px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#dfe5e7;
+  color:#54656f;
+  font-size:34px;
+}
+.incoming-call-name { font-size:22px; color:#111b21; font-weight:500; }
+.incoming-call-type { margin-top:6px; color:#667781; }
+.incoming-call-actions { display:flex; justify-content:center; gap:42px; margin-top:28px; }
+.call-action {
+  width:58px; height:58px; border-radius:50%; color:#fff; font-size:24px;
+}
+.call-action.decline { background:#ea0038; }
+.call-action.accept { background:#00a884; }
+
+.active-call {
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  background:#111b21;
+}
+.remote-video {
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  background:#111b21;
+}
+.local-video {
+  position:absolute;
+  right:22px;
+  top:78px;
+  width:min(220px,30vw);
+  aspect-ratio:16/9;
+  object-fit:cover;
+  border-radius:12px;
+  background:#263238;
+  box-shadow:0 4px 20px rgba(0,0,0,.4);
+}
+.call-topbar {
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  padding:20px 24px;
+  color:#fff;
+  background:linear-gradient(rgba(0,0,0,.55), transparent);
+}
+.call-name { font-size:18px; font-weight:500; }
+.call-status { margin-top:3px; font-size:13px; opacity:.85; }
+.call-controls {
+  position:absolute;
+  bottom:30px;
+  left:50%;
+  transform:translateX(-50%);
+  display:flex;
+  gap:14px;
+  padding:10px 14px;
+  border-radius:40px;
+  background:rgba(32,44,51,.88);
+}
+.call-control {
+  width:50px;
+  height:50px;
+  border-radius:50%;
+  background:#43535d;
+  color:#fff;
+  font-size:21px;
+}
+.call-control:hover { background:#53666f; }
+.call-control.off { background:#d9e1e5; color:#111b21; }
+.call-control.end { background:#ea0038; transform:rotate(135deg); }
+
+@media (max-width:768px) {
+  .chat-call-actions { gap:0; }
+  .chat-call-button { width:36px; height:36px; font-size:18px; }
+  .local-video { right:12px; top:72px; width:120px; }
+}
