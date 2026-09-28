@@ -67,7 +67,7 @@ function createAuthUI() {
   container.innerHTML = `
     <div class="auth-card">
       <div class="auth-title">MissApp</div>
-      <div class="auth-subtitle">Secure real-time messaging</div>
+      <div class="auth-subtitle">Secure real-time messaging</div>\n      <div id="auth-error" class="auth-error hidden" role="alert"></div>
 
       <form id="login-form" class="auth-form">
         <div class="auth-field">
@@ -410,7 +410,7 @@ async function handleLogin(event) {
     return;
   }
 
-  setButtonLoading(button, true, "Logging in...");
+  setButtonLoading(button, true, "Logging in...");\n  const loginTimeout = setTimeout(() => {\n    if (button?.disabled) {\n      setButtonLoading(button, false, "Login");\n      showToast("Login is taking too long. Check your connection and try again.", "error");\n    }\n  }, 15000);
 
   try {
     await login(email, password);
