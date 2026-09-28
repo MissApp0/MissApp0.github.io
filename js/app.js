@@ -455,7 +455,13 @@ async function handleLogin(event) {
     return;
   }
 
-  setButtonLoading(button, true, "Logging in...");\n  const loginTimeout = setTimeout(() => {\n    if (button?.disabled) {\n      setButtonLoading(button, false, "Login");\n      showToast("Login is taking too long. Check your connection and try again.", "error");\n    }\n  }, 15000);
+  setButtonLoading(button, true, "Logging in...");
+  const loginTimeout = setTimeout(() => {
+    if (button?.disabled) {
+      setButtonLoading(button, false, "Login");
+      showToast("Login is taking too long. Check your connection and try again.", "error");
+    }
+  }, 15000);
 
   try {
     await login(email, password);
