@@ -14,22 +14,41 @@ import {
   where
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
+const stunServers = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+  { urls: "stun:stun.cloudflare.com:3478" }
+];
+
+function buildIceServers() {
+  const urls = Array.isArray(turnConfig?.urls)
+    ? turnConfig.urls.filter(Boolean)
+    : [];
+
+  const hasCredentials =
+    Boolean(turnConfig?.username) &&
+    Boolean(turnConfig?.credential);
+
+  const turnServers = hasCredentials && urls.length
+    ? [{
+        urls,
+        username: turnConfig.username,
+        credential: turnConfig.credential,
+        ...(turnConfig.credentialType
+          ? { credentialType: turnConfig.credentialType }
+          : {})
+      }]
+    : [];
+
+  return [...stunServers, ...turnServers];
+}
+
 const rtcConfig = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "stun:stun.cloudflare.com:3478" },
-    ...(turnConfig.urls?.length && turnConfig.username && turnConfig.credential
-      ? [{
-          urls: turnConfig.urls,
-          username: turnConfig.username,
-          credential: turnConfig.credential
-        }]
-      : [])
-  ],
+  iceServers: buildIceServers(),
   iceCandidatePoolSize: 10,
   bundlePolicy: "max-bundle",
-  rtcpMuxPolicy: "require"
+  rtcpMuxPolicy: "require",
+  iceTransportPolicy: "all"
 };
 
 let activeCall = null;
@@ -66,6 +85,23 @@ function attachPeerMonitoring(peer, call) {
 
   peer.oniceconnectionstatechange = () => {
     console.log("MissApp ICE state:", peer.iceConnectionState);
+
+    const status = document.getElementById("call-status");
+
+    if (peer.iceConnectionState === "checking") {
+      if (status) status.textContent = "Connecting…";
+    } else if (peer.iceConnectionState === "connected" ||
+               peer.iceConnectionState === "completed") {
+      if (status) status.textContent = "Connected";
+    } else if (peer.iceConnectionState === "disconnected") {
+      if (status) status.textContent = "Reconnecting…";
+    } else if (peer.iceConnectionState === "failed") {
+      if (status) status.textContent = "Network connection failed";
+    }
+  };
+
+  peer.onicegatheringstatechange = () => {
+    console.log("MissApp ICE gathering:", peer.iceGatheringState);
   };
 }
 
@@ -129,7 +165,9 @@ function listenForIncomingCalls() {
 }
 
 export async function startCall({ calleeId, calleeName, video = false }) {
-  if (!auth.currentUser || !calleeId) return;
+  if (!auth.currentUser || !calleeId) {
+    throw new Error("The other user could not be identified.");
+  }
 
   if (activeCall) {
     throw new Error("A call is already active.");
@@ -139,10 +177,26 @@ export async function startCall({ calleeId, calleeName, video = false }) {
     throw new Error("Camera and microphone are not available in this browser.");
   }
 
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: true,
-    video
-  });
+  let stream;
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      },
+      video: video
+        ? {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            frameRate: { ideal: 30, max: 30 }
+          }
+        : false
+    });
+  } catch (error) {
+    throw new Error(getMediaError(error));
+  }
 
   const peer = new RTCPeerConnection(rtcConfig);
   stream.getTracks().forEach(track => peer.addTrack(track, stream));
@@ -314,7 +368,10 @@ function listenForCallerCandidates(callId, peer) {
   const unsub = onSnapshot(collection(db, "calls", callId, "callerCandidates"), snapshot => {
     snapshot.docChanges().forEach(change => {
       if (change.type === "added") {
-        peer.addIceCandidate(new RTCIceCandidate(change.doc.data())).catch(console.error);
+        addRemoteCandidate(
+          peer,
+          new RTCIceCandidate(change.doc.data())
+        );
       }
     });
   });
@@ -451,6 +508,31 @@ function hideIncomingCall() {
 
 function hideCallScreen() {
   document.getElementById("active-call")?.remove();
+}
+
+function getMediaError(error) {
+  switch (error?.name) {
+    case "NotAllowedError":
+    case "PermissionDeniedError":
+      return "Camera or microphone permission was denied. Allow access in your browser settings and try again.";
+
+    case "NotFoundError":
+    case "DevicesNotFoundError":
+      return "No usable microphone or camera was found.";
+
+    case "NotReadableError":
+    case "TrackStartError":
+      return "Your camera or microphone is already being used by another app.";
+
+    case "OverconstrainedError":
+      return "The selected camera or microphone does not support the requested settings.";
+
+    case "SecurityError":
+      return "Camera and microphone access is blocked by browser security settings.";
+
+    default:
+      return error?.message || "Could not access the camera or microphone.";
+  }
 }
 
 function escapeHtml(value) {
