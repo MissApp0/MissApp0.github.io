@@ -1853,6 +1853,53 @@ function settingsRow(icon, label, description, id, enabled) {
   return `<div class="settings-row"><div class="settings-icon">${icon}</div><div class="settings-copy"><div class="settings-label">${label}</div><div class="settings-description">${description}</div></div><button id="${id}" class="settings-switch ${enabled ? "active" : ""}" type="button" role="switch" aria-checked="${enabled}"></button></div>`;
 }
 
+
+function renderThemePicker() {
+  const container = document.getElementById("theme-picker");
+  if (!container) return;
+
+  const currentTheme = getTheme();
+  const options = themeOptions();
+
+  const swatches = {
+    emerald: "linear-gradient(135deg, #12a884, #087f68)",
+    midnight: "linear-gradient(135deg, #151b2b, #394867)",
+    ocean: "linear-gradient(135deg, #168aad, #52b69a)",
+    rose: "linear-gradient(135deg, #e75480, #c44569)",
+    sunset: "linear-gradient(135deg, #ff8a3d, #e85d04)",
+    lavender: "linear-gradient(135deg, #9b72cf, #6c63a8)",
+    graphite: "linear-gradient(135deg, #343a40, #868e96)"
+  };
+
+  container.innerHTML = options.map(theme => {
+    const active = currentTheme === theme.id;
+    const swatch = swatches[theme.id] || "#12a884";
+
+    return `
+      <button
+        class="theme-option${active ? " active" : ""}"
+        type="button"
+        data-theme-id="${escapeHTML(theme.id)}"
+        aria-pressed="${active}"
+        title="${escapeHTML(theme.description)}"
+      >
+        <span
+          class="theme-swatch"
+          style="--swatch: ${swatch}"
+          aria-hidden="true"
+        >${escapeHTML(theme.icon)}</span>
+
+        <span class="theme-option-copy">
+          <span class="theme-option-name">${escapeHTML(theme.name)}</span>
+          <span class="theme-option-description">${escapeHTML(theme.description)}</span>
+        </span>
+
+        ${active ? '<span class="theme-option-check">✓</span>' : ""}
+      </button>
+    `;
+  }).join("");
+}
+
 function openSettings() {
   closeSettings();
   const s = getSoundSettings();
