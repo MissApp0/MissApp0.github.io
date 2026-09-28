@@ -8,7 +8,9 @@ import {
   onSnapshot,
   serverTimestamp,
   setDoc,
-  updateDoc
+  updateDoc,
+  query,
+  where
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const rtcConfig = {
@@ -29,7 +31,10 @@ export function initCalls() {
 function listenForIncomingCalls() {
   incomingUnsubscribe?.();
 
-  const callsRef = collection(db, "calls");
+  const callsRef = query(
+    collection(db, "calls"),
+    where("callee", "==", auth.currentUser.uid)
+  );
 
   incomingUnsubscribe = onSnapshot(callsRef, snapshot => {
     snapshot.docChanges().forEach(change => {
