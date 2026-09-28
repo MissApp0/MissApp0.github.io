@@ -16,12 +16,75 @@ import {
 const rtcConfig = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" }
-  ]
+    { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun.cloudflare.com:3478" }
+  ],
+  iceCandidatePoolSize: 10
 };
 
 let activeCall = null;
 let incomingUnsubscribe = null;
+
+function attachPeerMonitoring(peer, call) {
+  peer.onconnectionstatechange = () => {
+    const status = document.getElementById("call-status");
+
+    if (peer.connectionState === "connected") {
+      if (status) status.textContent = "Connected";
+      return;
+    }
+
+    if (peer.connectionState === "connecting") {
+      if (status) status.textContent = "Connecting…";
+      return;
+    }
+
+    if (peer.connectionState === "disconnected") {
+      if (status) status.textContent = "Connection interrupted…";
+      return;
+    }
+
+    if (peer.connectionState === "failed") {
+      if (status) status.textContent = "Connection failed";
+      setTimeout(() => {
+        if (activeCall?.id === call.id) {
+          endActiveCall(true);
+        }
+      }, 1200);
+    }
+  };
+
+  peer.oniceconnectionstatechange = () => {
+    console.log("MissApp ICE state:", peer.iceConnectionState);
+  };
+}
+
+function addRemoteCandidate(peer, candidate) {
+  if (!candidate) return;
+
+  if (!peer.remoteDescription) {
+    peer.__missappIceQueue = peer.__missappIceQueue || [];
+    peer.__missappIceQueue.push(candidate);
+    return;
+  }
+
+  peer.addIceCandidate(candidate).catch(error => {
+    console.error("ICE candidate error:", error);
+  });
+}
+
+async function flushRemoteCandidates(peer) {
+  const queue = peer.__missappIceQueue || [];
+  peer.__missappIceQueue = [];
+
+  for (const candidate of queue) {
+    try {
+      await peer.addIceCandidate(candidate);
+    } catch (error) {
+      console.error("Queued ICE candidate error:", error);
+    }
+  }
+}
 
 export function initCalls() {
   if (!auth.currentUser) return;
@@ -88,6 +151,8 @@ export async function startCall({ calleeId, calleeName, video = false }) {
     createdAt: serverTimestamp()
   };
 
+  attachPeerMonitoring(peer, call);
+
   const remoteStream = new MediaStream();
 
   peer.ontrack = event => {
@@ -149,6 +214,8 @@ async function answerCall(call) {
     await addDoc(collection(db, "calls", call.id, "calleeCandidates"), event.candidate.toJSON());
   };
 
+  attachPeerMonitoring(peer, call);
+
   const callRef = doc(db, "calls", call.id);
   const snapshot = await getDoc(callRef);
 
@@ -161,6 +228,7 @@ async function answerCall(call) {
   const data = snapshot.data();
 
   await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
+  await flushRemoteCandidates(peer);
 
   const answer = await peer.createAnswer();
   await peer.setLocalDescription(answer);
@@ -199,6 +267,7 @@ function listenForAnswer(callId, peer) {
 
     try {
       await peer.setRemoteDescription(new RTCSessionDescription(data.answer));
+      await flushRemoteCandidates(peer);
       await updateDoc(doc(db, "calls", callId), { status: "connected" });
     } catch (error) {
       console.error("Set remote answer error:", error);
@@ -223,7 +292,7 @@ function listenForCalleeCandidates(callId, peer) {
   const unsub = onSnapshot(collection(db, "calls", callId, "calleeCandidates"), snapshot => {
     snapshot.docChanges().forEach(change => {
       if (change.type === "added") {
-        peer.addIceCandidate(new RTCIceCandidate(change.doc.data())).catch(console.error);
+        addRemoteCandidate(peer, new RTCIceCandidate(change.doc.data()));
       }
     });
   });
