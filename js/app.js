@@ -1,6 +1,6 @@
 import { auth, db } from "./firebase.js";
 import { state } from "./state.js";
-import { playSound, getSoundSettings, updateSoundSettings, resetSoundSettings, unlockAudio } from "./sounds.js";
+import { playSound, getSoundSettings, updateSoundSettings, resetSoundSettings, unlockAudio, soundTypes } from "./sounds.js";
 import { initTheme, getTheme, setTheme, themeOptions } from "./themes.js";
 
 import { login } from "./auth/login.js";
@@ -1867,6 +1867,7 @@ function openSettings() {
         <div class="settings-row"><div class="settings-icon">▶</div><div class="settings-copy"><div class="settings-label">Test sound</div><div class="settings-description">Tap to check that MissApp audio is working.</div></div><button id="settings-test-sound" class="settings-reset" type="button">Play</button></div>
         ${settingsRow("🔊", "Sound effects", "Play MissApp sounds.", "sound-enabled", s.enabled)}
         <div class="settings-row"><div class="settings-icon">🔉</div><div class="settings-copy"><div class="settings-label">Volume</div><div class="settings-description">Notification sound volume</div></div><input id="sound-volume" class="settings-range" type="range" min="0" max="100" value="${Math.round(s.volume * 100)}" aria-label="Sound volume"></div>
+        <div class="settings-row"><div class="settings-icon">🎵</div><div class="settings-copy"><div class="settings-label">Sound type</div><div class="settings-description">Choose the style of MissApp notifications.</div></div><select id="sound-type" class="settings-select" aria-label="Sound type">${Object.entries(soundTypes).map(([id,type]) => '<option value="'+escapeHTML(id)+'" '+(s.soundType === id ? 'selected' : '')+'>'+escapeHTML(type.name)+'</option>').join('')}</select></div>
         ${settingsRow("✉", "Message sent", "Sound after sending.", "sound-messageSent", s.messageSent)}
         ${settingsRow("💬", "Message received", "Sound for incoming messages.", "sound-messageReceived", s.messageReceived)}
         ${settingsRow("☎", "Incoming calls", "Incoming-call alert.", "sound-incomingCall", s.incomingCall)}
@@ -1944,6 +1945,11 @@ function setupSettingsEvents() {
   modal.querySelector("#settings-reset")?.addEventListener("click", () => { resetSoundSettings(); openSettings(); });
   modal.querySelector("#settings-hard-refresh")?.addEventListener("click", hardRefreshApp);
   modal.querySelector("#sound-volume")?.addEventListener("input", event => updateSoundSettings({ volume: Number(event.target.value) / 100 }));
+  modal.querySelector("#sound-type")?.addEventListener("change", async event => {
+    updateSoundSettings({ soundType: event.target.value });
+    await unlockAudio();
+    playSound("messageReceived");
+  });
   [["sound-enabled","enabled"],["sound-messageSent","messageSent"],["sound-messageReceived","messageReceived"],["sound-incomingCall","incomingCall"],["sound-callConnected","callConnected"]].forEach(([id,key]) => {
     modal.querySelector("#"+id)?.addEventListener("click", event => { const next = !getSoundSettings()[key]; updateSoundSettings({ [key]: next }); event.currentTarget.classList.toggle("active", next); event.currentTarget.setAttribute("aria-checked", String(next)); if (next && key !== "enabled") playSound(key); });
   });
