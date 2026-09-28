@@ -1360,7 +1360,7 @@ function getAuthError(error) {
 function getFirestoreError(error) {
   switch (error?.code) {
     case "permission-denied":
-      return "You don't have permission to send messages.";
+      return "Firebase denied this action. Make sure the latest Firestore rules are published.";
 
     case "unavailable":
       return "Firestore is temporarily unavailable.";
@@ -1371,8 +1371,6 @@ function getFirestoreError(error) {
     case "unauthenticated":
       return "Please log in again.";
 
-    case "permission-denied":
-      return "Firebase denied this action. Deploy the latest firestore.rules to your Firebase project.";
 
     default:
       return (
