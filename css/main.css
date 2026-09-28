@@ -104,8 +104,10 @@ button:active {
 .btn {
   min-height: 42px;
   padding: 0 16px;
+  border: 1px solid transparent;
   border-radius: 11px;
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #fff;
   box-shadow: 0 7px 18px rgba(18,168,132,.20);
   font-weight: 700;
 }
