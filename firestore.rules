@@ -28,6 +28,45 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+
+    match /statuses/{statusId} {
+      // Authenticated users may see only live statuses.
+      allow read: if signedIn()
+        && resource.data.expiresAt is timestamp
+        && resource.data.expiresAt > request.time;
+
+      // A user may publish only as themselves, for at most 24 hours.
+      allow create: if signedIn()
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 500
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt <= request.time + duration.value(24, "h");
+
+      allow update: if signedIn()
+        && resource.data.authorId == request.auth.uid
+        && request.resource.data.authorId == resource.data.authorId
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 500;
+
+      allow delete: if signedIn()
+        && resource.data.authorId == request.auth.uid;
+
+      match /viewers/{viewerId} {
+        allow read: if signedIn()
+          && get(/databases/$(database)/documents/statuses/$(statusId)).data.authorId == request.auth.uid;
+
+        allow create: if signedIn()
+          && request.auth.uid == viewerId
+          && get(/databases/$(database)/documents/statuses/$(statusId)).data.expiresAt > request.time;
+
+        allow update, delete: if false;
+      }
+    }
+
     match /calls/{callId} {
       allow read: if signedIn()
         && (resource.data.caller == request.auth.uid
