@@ -118,7 +118,7 @@ function createAppUI() {
   sidebar.innerHTML = `
     <div class="sidebar-header">
       <div class="sidebar-top">
-        <div class="sidebar-title">MissApp</div>
+        <div class="sidebar-title">WhatsApp</div>
 
         <button id="close-sidebar" class="mobile-sidebar-button" type="button" aria-label="Close conversations">
           ×
@@ -135,7 +135,7 @@ function createAppUI() {
       </div>
 
       <div class="search-container">
-        <input id="user-search" class="input" type="search" placeholder="Search users..." autocomplete="off" aria-label="Search users">
+        <input id="user-search" class="input" type="search" placeholder="Search or start new chat" autocomplete="off" aria-label="Search users">
         <div id="search-results" class="search-results"></div>
       </div>
     </div>
@@ -184,7 +184,7 @@ function createAppUI() {
     <div class="chat-composer">
       <form id="composer-form" class="composer-form">
         <div class="composer-wrapper">
-          <textarea id="message-input" class="composer-input" rows="1" maxlength="4000" placeholder="Write a message..." disabled></textarea>
+          <textarea id="message-input" class="composer-input" rows="1" maxlength="4000" placeholder="Type a message" disabled></textarea>
           <div id="message-counter" class="message-counter">0 / 4000</div>
         </div>
 
