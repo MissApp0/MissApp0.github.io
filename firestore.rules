@@ -107,7 +107,11 @@ service cloud.firestore {
     // Collection-group read rule for MissApp's global incoming-message listener.
     // app.js queries every messages subcollection with receiver == request.auth.uid.
     match /{path=**}/messages/{messageId} {
-      allow read: if signedIn()
+      // Explicit collection-group permissions for collectionGroup("messages").
+      allow list: if signedIn()
+        && resource.data.receiver == request.auth.uid;
+
+      allow get: if signedIn()
         && resource.data.receiver == request.auth.uid;
     }
 
