@@ -51,31 +51,83 @@ const rtcConfig = {
   iceTransportPolicy: "all"
 };
 
+const CALL_TIMEOUT_MS = 30000;
+const RECONNECT_GRACE_MS = 12000;
+
 let activeCall = null;
 let incomingUnsubscribe = null;
+let callTimeout = null;
+
+function clearCallTimeout() {
+  if (callTimeout) {
+    clearTimeout(callTimeout);
+    callTimeout = null;
+  }
+}
+
+function armCallTimeout(callId) {
+  clearCallTimeout();
+  callTimeout = setTimeout(() => {
+    if (activeCall?.id !== callId) return;
+
+    const state = activeCall.peer?.connectionState;
+    if (state !== "connected") {
+      setCallStatus("No answer", "The call could not establish a connection.");
+      endActiveCall(true);
+    }
+  }, CALL_TIMEOUT_MS);
+}
+
+function setCallStatus(text, detail = "") {
+  const status = document.getElementById("call-status");
+  if (status) status.textContent = text;
+
+  const sub = document.getElementById("call-status-detail");
+  if (sub) sub.textContent = detail;
+}
+
+function getCallCapabilities() {
+  return {
+    webrtc: typeof RTCPeerConnection !== "undefined",
+    media: Boolean(navigator.mediaDevices?.getUserMedia),
+    secureContext: window.isSecureContext,
+    video: Boolean(document.createElement("video").canPlayType),
+    turnConfigured: buildIceServers().some(server => {
+      const urls = Array.isArray(server.urls) ? server.urls : [server.urls];
+      return urls.some(url => String(url).startsWith("turn:") || String(url).startsWith("turns:"));
+    })
+  };
+}
 
 function attachPeerMonitoring(peer, call) {
   peer.onconnectionstatechange = () => {
     const status = document.getElementById("call-status");
 
     if (peer.connectionState === "connected") {
-      if (status) status.textContent = "Connected";
+      clearCallTimeout();
+      setCallStatus("Connected");
       logSelectedIceRoute(peer);
       return;
     }
 
     if (peer.connectionState === "connecting") {
-      if (status) status.textContent = "Connecting…";
+      setCallStatus("Connecting…");
       return;
     }
 
     if (peer.connectionState === "disconnected") {
-      if (status) status.textContent = "Connection interrupted…";
+      setCallStatus("Reconnecting…");
+      setTimeout(() => {
+        if (activeCall?.id === call.id &&
+            activeCall.peer?.connectionState === "disconnected") {
+          setCallStatus("Connection lost");
+        }
+      }, RECONNECT_GRACE_MS);
       return;
     }
 
     if (peer.connectionState === "failed") {
-      if (status) status.textContent = "Connection failed";
+      setCallStatus("Connection failed", "Check your network or TURN configuration.");
       setTimeout(() => {
         if (activeCall?.id === call.id) {
           endActiveCall(true);
@@ -178,6 +230,14 @@ export async function startCall({ calleeId, calleeName, video = false }) {
     throw new Error("The other user could not be identified.");
   }
 
+  const capabilities = getCallCapabilities();
+  if (!capabilities.webrtc || !capabilities.media) {
+    throw new Error("This browser does not support camera and microphone calling.");
+  }
+  if (!capabilities.secureContext) {
+    throw new Error("Calls require HTTPS. Open MissApp through its secure HTTPS address.");
+  }
+
   if (activeCall) {
     throw new Error("A call is already active.");
   }
@@ -257,6 +317,7 @@ export async function startCall({ calleeId, calleeName, video = false }) {
   listenForCalleeCandidates(callRef.id, peer);
 
   showCallScreen(activeCall);
+  armCallTimeout(call.id);
 }
 
 async function answerCall(call) {
@@ -324,6 +385,7 @@ async function answerCall(call) {
   listenForCallState(call.id);
 
   showCallScreen(activeCall);
+  clearCallTimeout();
 }
 
 function listenForAnswer(callId, peer) {
@@ -404,6 +466,7 @@ export async function endActiveCall(notify = true) {
   if (!call) return;
 
   activeCall = null;
+  clearCallTimeout();
 
   if (notify) {
     try {
@@ -473,6 +536,7 @@ function showCallScreen(call) {
     <div class="call-topbar">
       <div class="call-name">${escapeHtml(call.role === "caller" ? call.calleeName : call.callerName)}</div>
       <div class="call-status" id="call-status">Calling…</div>
+      <div class="call-status-detail" id="call-status-detail"></div>
     </div>
     <video id="local-video" class="local-video" autoplay muted playsinline></video>
     <div class="call-controls">
@@ -591,5 +655,6 @@ window.MissAppCalls = {
   startCall,
   answerCall,
   declineCall,
-  endActiveCall
+  endActiveCall,
+  getCallCapabilities
 };
