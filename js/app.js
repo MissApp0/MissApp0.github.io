@@ -960,13 +960,12 @@ async function handleSendMessage(event) {
         "messages"
       ),
       {
-        senderId:
-          state.user.uid,
-
+        senderId: state.user.uid,
+        sender: state.user.uid,
+        receiver: state.currentConversation.otherUserId || "",
+        senderName: state.me?.displayName || state.me?.username || state.user.email || "User",
         text,
-
-        createdAt:
-          serverTimestamp()
+        createdAt: serverTimestamp()
       }
     );
 
