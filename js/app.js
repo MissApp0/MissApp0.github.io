@@ -53,6 +53,7 @@ let incomingMessageReady = false;
 let networkOnline = navigator.onLine;
 let lastRealtimeActivity = 0;
 let healthTimer = null;
+let realtimeHealthy = true;
 
 document.addEventListener("DOMContentLoaded", init, { once: true });
 
@@ -324,7 +325,7 @@ function updateConnectionUI() {
 
   const stale = lastRealtimeActivity && Date.now() - lastRealtimeActivity > 45000;
 
-  if (stale) {
+  if (!realtimeHealthy || stale) {
     banner.classList.add("visible");
     banner.classList.remove("offline");
     text.textContent = "Realtime connection is reconnecting…";
@@ -346,6 +347,7 @@ async function retryConnection() {
       return;
     }
 
+    realtimeHealthy = true;
     startConversationListener();
     startIncomingMessageListener();
 
@@ -842,6 +844,7 @@ function startIncomingMessageListener() {
     incomingQuery,
     snapshot => {
       lastRealtimeActivity = Date.now();
+      realtimeHealthy = true;
       updateConnectionUI();
 
       if (!incomingMessageReady) {
@@ -1170,6 +1173,8 @@ function listenToMessages(conversationId) {
       messageListenerReady = true;
     },
     error => {
+      realtimeHealthy = false;
+      updateConnectionUI();
       console.error(
         "Message listener error:",
         error
