@@ -157,7 +157,10 @@ function createAppUI() {
     </div>
 
     <div class="sidebar-footer">
-      <button id="logout-button" class="btn" type="button">Logout</button>
+      <div class="sidebar-footer-actions">
+        <button id="settings-button" class="btn secondary" type="button">⚙ Settings</button>
+        <button id="logout-button" class="btn" type="button">Logout</button>
+      </div>
     </div>
   `;
 
