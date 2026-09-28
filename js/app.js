@@ -1860,100 +1860,74 @@ function openSettings() {
   modal.className = "settings-modal";
   modal.id = "settings-modal";
   modal.innerHTML = `
-    <div class="settings-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-      <div class="settings-header"><div class="settings-title" id="settings-title">Settings</div><button class="settings-close" id="settings-close" type="button" aria-label="Close settings">×</button></div>
-      <div class="settings-section">
-        <div class="settings-section-title">Sounds & notifications</div>
-        <div class="settings-row"><div class="settings-icon">▶</div><div class="settings-copy"><div class="settings-label">Test sound</div><div class="settings-description">Tap to check that MissApp audio is working.</div></div><button id="settings-test-sound" class="settings-reset" type="button">Play</button></div>
-        ${settingsRow("🔊", "Sound effects", "Play MissApp sounds.", "sound-enabled", s.enabled)}
-        <div class="settings-row"><div class="settings-icon">🔉</div><div class="settings-copy"><div class="settings-label">Volume</div><div class="settings-description">Notification sound volume</div></div><input id="sound-volume" class="settings-range" type="range" min="0" max="100" value="${Math.round(s.volume * 100)}" aria-label="Sound volume"></div>
-        <div class="settings-row"><div class="settings-icon">🎵</div><div class="settings-copy"><div class="settings-label">Sound type</div><div class="settings-description">Choose the style of MissApp notifications.</div></div><select id="sound-type" class="settings-select" aria-label="Sound type">${Object.entries(soundTypes).map(([id,type]) => '<option value="'+escapeHTML(id)+'" '+(s.soundType === id ? 'selected' : '')+'>'+escapeHTML(type.name)+'</option>').join('')}</select></div>
-        ${settingsRow("✉", "Message sent", "Sound after sending.", "sound-messageSent", s.messageSent)}
-        ${settingsRow("💬", "Message received", "Sound for incoming messages.", "sound-messageReceived", s.messageReceived)}
-        ${settingsRow("☎", "Incoming calls", "Incoming-call alert.", "sound-incomingCall", s.incomingCall)}
-        ${settingsRow("✓", "Call connected", "Confirmation when connected.", "sound-callConnected", s.callConnected)}
-      </div>
-      <div class="settings-section">
-        <div class="settings-section-title">Appearance</div>
-        <div class="settings-row">
-          <div class="settings-icon">🎨</div>
-          <div class="settings-copy">
-            <div class="settings-label">Theme</div>
-            <div class="settings-description">Choose the look and colors of MissApp.</div>
-          </div>
+    <div class="settings-card settings-layout" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <aside class="settings-sidebar" aria-label="Settings categories">
+        <div class="settings-sidebar-head">
+          <div class="settings-sidebar-mark">M</div>
+          <div><div class="settings-sidebar-title">Settings</div><div class="settings-sidebar-subtitle">MissApp</div></div>
         </div>
-        <div id="theme-picker" class="theme-picker" aria-label="Theme selection"></div>
-      </div>
-      <div class="settings-section">
-        <div class="settings-section-title">App</div>
-        <div class="settings-row"><div class="settings-icon">🌐</div><div class="settings-copy"><div class="settings-label">Language</div><div class="settings-description">Interface language</div></div><select class="settings-select" disabled><option>English</option></select></div>
-        <div class="settings-row"><div class="settings-icon">↻</div><div class="settings-copy"><div class="settings-label">Hard refresh</div><div class="settings-description">Clear cached app resources and reload MissApp.</div></div><button id="settings-hard-refresh" class="settings-reset" type="button">Refresh</button></div>
-      </div>
-      <div class="settings-footer"><button id="settings-reset" class="settings-reset" type="button">Reset sound settings</button></div>
+        <nav class="settings-nav" aria-label="Settings">
+          <button class="settings-nav-item active" type="button" data-settings-tab="general"><span class="settings-nav-icon">⚙</span><span>General</span></button>
+          <button class="settings-nav-item" type="button" data-settings-tab="sounds"><span class="settings-nav-icon">🔊</span><span>Sounds</span></button>
+          <button class="settings-nav-item" type="button" data-settings-tab="appearance"><span class="settings-nav-icon">🎨</span><span>Appearance</span></button>
+          <button class="settings-nav-item" type="button" data-settings-tab="app"><span class="settings-nav-icon">◉</span><span>App</span></button>
+        </nav>
+        <div class="settings-sidebar-footer">Personalize your MissApp experience.</div>
+      </aside>
+
+      <main class="settings-main">
+        <header class="settings-header">
+          <div>
+            <div class="settings-kicker">MissApp preferences</div>
+            <div class="settings-title" id="settings-title">General</div>
+          </div>
+          <button class="settings-close" id="settings-close" type="button" aria-label="Close settings">×</button>
+        </header>
+
+        <div class="settings-content">
+          <section class="settings-tab-panel active" data-settings-panel="general">
+            <div class="settings-panel-intro"><div class="settings-panel-title">General</div><div class="settings-panel-description">A few essentials for how MissApp behaves.</div></div>
+            <div class="settings-panel-card">
+              <div class="settings-row"><div class="settings-icon">🌐</div><div class="settings-copy"><div class="settings-label">Language</div><div class="settings-description">Interface language</div></div><select class="settings-select" disabled><option>English</option></select></div>
+              <div class="settings-row"><div class="settings-icon">↻</div><div class="settings-copy"><div class="settings-label">Hard refresh</div><div class="settings-description">Clear cached app resources and reload MissApp.</div></div><button id="settings-hard-refresh" class="settings-reset" type="button">Refresh</button></div>
+            </div>
+          </section>
+
+          <section class="settings-tab-panel" data-settings-panel="sounds" hidden>
+            <div class="settings-panel-intro"><div class="settings-panel-title">Sounds & notifications</div><div class="settings-panel-description">Control notification sounds, volume, and call alerts.</div></div>
+            <div class="settings-panel-card">
+              <div class="settings-row"><div class="settings-icon">▶</div><div class="settings-copy"><div class="settings-label">Test sound</div><div class="settings-description">Tap to check that MissApp audio is working.</div></div><button id="settings-test-sound" class="settings-reset" type="button">Play</button></div>
+              ${settingsRow("🔊", "Sound effects", "Play MissApp sounds.", "sound-enabled", s.enabled)}
+              <div class="settings-row"><div class="settings-icon">🔉</div><div class="settings-copy"><div class="settings-label">Volume</div><div class="settings-description">Notification sound volume</div></div><input id="sound-volume" class="settings-range" type="range" min="0" max="100" value="${Math.round(s.volume * 100)}" aria-label="Sound volume"></div>
+              <div class="settings-row"><div class="settings-icon">🎵</div><div class="settings-copy"><div class="settings-label">Sound type</div><div class="settings-description">Choose the style of MissApp notifications.</div></div><select id="sound-type" class="settings-select" aria-label="Sound type">${Object.entries(soundTypes).map(([id,type]) => '<option value="' + escapeHTML(id) + '" ' + (s.soundType === id ? 'selected' : '') + '>' + escapeHTML(type.name) + '</option>').join('')}</select></div>
+              ${settingsRow("✉", "Message sent", "Sound after sending.", "sound-messageSent", s.messageSent)}
+              ${settingsRow("💬", "Message received", "Sound for incoming messages.", "sound-messageReceived", s.messageReceived)}
+              ${settingsRow("☎", "Incoming calls", "Incoming-call alert.", "sound-incomingCall", s.incomingCall)}
+              ${settingsRow("✓", "Call connected", "Confirmation when connected.", "sound-callConnected", s.callConnected)}
+            </div>
+            <div class="settings-panel-footer"><button id="settings-reset" class="settings-reset" type="button">Reset sound settings</button></div>
+          </section>
+
+          <section class="settings-tab-panel" data-settings-panel="appearance" hidden>
+            <div class="settings-panel-intro"><div class="settings-panel-title">Appearance</div><div class="settings-panel-description">Choose the look and colors of MissApp.</div></div>
+            <div class="settings-panel-card"><div id="theme-picker" class="theme-picker" aria-label="Theme selection"></div></div>
+          </section>
+
+          <section class="settings-tab-panel" data-settings-panel="app" hidden>
+            <div class="settings-panel-intro"><div class="settings-panel-title">App</div><div class="settings-panel-description">Tools for refreshing and maintaining your app.</div></div>
+            <div class="settings-panel-card">
+              <div class="settings-row"><div class="settings-icon">ℹ</div><div class="settings-copy"><div class="settings-label">MissApp</div><div class="settings-description">Private, simple, real-time conversations.</div></div><span class="settings-badge">Ready</span></div>
+              <div class="settings-row"><div class="settings-icon">↻</div><div class="settings-copy"><div class="settings-label">Hard refresh</div><div class="settings-description">Clear cached app resources and reload MissApp.</div></div><button id="settings-hard-refresh-app" class="settings-reset" type="button">Refresh</button></div>
+            </div>
+          </section>
+        </div>
+      </main>
     </div>
   `;
   document.body.appendChild(modal);
   renderThemePicker();
   unlockAudio();
   setupSettingsEvents();
-}
-
-function renderThemePicker() {
-  const picker = document.getElementById("theme-picker");
-  if (!picker) return;
-
-  const activeTheme = getTheme();
-  picker.innerHTML = themeOptions().map(theme => {
-    const swatch = {
-      emerald: "#12a884",
-      midnight: "#25d4a5",
-      ocean: "#1687d9",
-      rose: "#d94f83",
-      sunset: "#e87532",
-      lavender: "#8559d6",
-      graphite: "#4d5963"
-    }[theme.id] || "#12a884";
-
-    return '<button type="button" class="theme-option ' +
-      (theme.id === activeTheme ? "active" : "") +
-      '" data-theme-id="' + escapeHTML(theme.id) +
-      '" aria-pressed="' + (theme.id === activeTheme) +
-      '" title="' + escapeHTML(theme.name) + '">' +
-      '<span class="theme-swatch" style="--swatch:' + swatch + '"></span>' +
-      '<span class="theme-option-copy"><span class="theme-option-name">' +
-      escapeHTML(theme.icon) + " " + escapeHTML(theme.name) +
-      '</span><span class="theme-option-description">' +
-      escapeHTML(theme.description) +
-      '</span></span>' +
-      (theme.id === activeTheme ? '<span class="theme-option-check">✓</span>' : "") +
-      '</button>';
-  }).join("");
-}
-
-function setupSettingsEvents() {
-  const modal = document.getElementById("settings-modal");
-  if (!modal) return;
-  modal.querySelector("#settings-close")?.addEventListener("click", closeSettings);
-  modal.querySelectorAll(".theme-option").forEach(button => {
-    button.addEventListener("click", () => {
-      setTheme(button.dataset.themeId);
-      renderThemePicker();
-      setupSettingsEvents();
-    });
-  });
-  modal.querySelector("#settings-test-sound")?.addEventListener("click", async () => { await unlockAudio(); playSound("messageReceived"); });
-  modal.querySelector("#settings-reset")?.addEventListener("click", () => { resetSoundSettings(); openSettings(); });
-  modal.querySelector("#settings-hard-refresh")?.addEventListener("click", hardRefreshApp);
-  modal.querySelector("#sound-volume")?.addEventListener("input", event => updateSoundSettings({ volume: Number(event.target.value) / 100 }));
-  modal.querySelector("#sound-type")?.addEventListener("change", async event => {
-    updateSoundSettings({ soundType: event.target.value });
-    await unlockAudio();
-    playSound("messageReceived");
-  });
-  [["sound-enabled","enabled"],["sound-messageSent","messageSent"],["sound-messageReceived","messageReceived"],["sound-incomingCall","incomingCall"],["sound-callConnected","callConnected"]].forEach(([id,key]) => {
-    modal.querySelector("#"+id)?.addEventListener("click", event => { const next = !getSoundSettings()[key]; updateSoundSettings({ [key]: next }); event.currentTarget.classList.toggle("active", next); event.currentTarget.setAttribute("aria-checked", String(next)); if (next && key !== "enabled") playSound(key); });
-  });
-  modal.addEventListener("click", event => { if (event.target === modal) closeSettings(); });
 }
 
 async function hardRefreshApp() {
