@@ -50,6 +50,9 @@ let currentConversationId = null;
 let messageListenerReady = false;
 let unsubscribeIncomingMessages = null;
 let incomingMessageReady = false;
+let networkOnline = navigator.onLine;
+let lastRealtimeActivity = 0;
+let healthTimer = null;
 
 document.addEventListener("DOMContentLoaded", init, { once: true });
 
@@ -58,6 +61,7 @@ function init() {
     createAuthUI();
     createAppUI();
     setupEvents();
+    setupConnectionMonitor();
     setupAuth();
   } catch (error) {
     console.error("MissApp initialization error:", error);
@@ -126,6 +130,13 @@ function createAuthUI() {
 
 function createAppUI() {
   if (!document.getElementById("incoming-notifications")) {
+    const connection = document.createElement("div");
+    connection.id = "connection-banner";
+    connection.setAttribute("role", "status");
+    connection.setAttribute("aria-live", "polite");
+    connection.innerHTML = `<span id="connection-dot"></span><span id="connection-text">Connecting…</span><button id="connection-retry" type="button">Retry</button>`;
+    document.body.appendChild(connection);
+
     const notifications = document.createElement("div");
     notifications.id = "incoming-notifications";
     notifications.setAttribute("aria-live", "polite");
@@ -235,6 +246,7 @@ function setupEvents() {
   document.getElementById("register-form")?.addEventListener("submit", handleRegister);
   document.getElementById("auth-switch-button")?.addEventListener("click", toggleAuth);
   document.getElementById("logout-button")?.addEventListener("click", handleLogout);
+  document.getElementById("connection-retry")?.addEventListener("click", retryConnection);
   document.getElementById("settings-button")?.addEventListener("click", openSettings);
   document.getElementById("user-search")?.addEventListener("input", handleSearch);
   document.getElementById("open-sidebar")?.addEventListener("click", openSidebar);
@@ -263,6 +275,96 @@ function setupEvents() {
       results.innerHTML = "";
     }
   });
+}
+
+function setupConnectionMonitor() {
+  updateConnectionUI();
+
+  window.addEventListener("online", () => {
+    networkOnline = true;
+    updateConnectionUI();
+    showToast("Connection restored.", "success");
+  });
+
+  window.addEventListener("offline", () => {
+    networkOnline = false;
+    updateConnectionUI();
+    showToast("You are offline. MissApp will reconnect automatically.", "error");
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && state.user) {
+      updateConnectionUI();
+      startConversationListener();
+      startIncomingMessageListener();
+      if (currentConversationId) {
+        listenToMessages(currentConversationId);
+      }
+    }
+  });
+
+  healthTimer = setInterval(updateConnectionUI, 15000);
+}
+
+function updateConnectionUI() {
+  const banner = document.getElementById("connection-banner");
+  const text = document.getElementById("connection-text");
+  if (!banner || !text) return;
+
+  if (!navigator.onLine) {
+    banner.classList.add("visible", "offline");
+    text.textContent = "Offline — waiting for connection";
+    return;
+  }
+
+  if (!state.user) {
+    banner.classList.remove("visible", "offline");
+    return;
+  }
+
+  const stale = lastRealtimeActivity && Date.now() - lastRealtimeActivity > 45000;
+
+  if (stale) {
+    banner.classList.add("visible");
+    banner.classList.remove("offline");
+    text.textContent = "Realtime connection is reconnecting…";
+  } else {
+    banner.classList.remove("visible", "offline");
+  }
+}
+
+async function retryConnection() {
+  const button = document.getElementById("connection-retry");
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Retrying…";
+  }
+
+  try {
+    if (!navigator.onLine) {
+      showToast("You are still offline.", "error");
+      return;
+    }
+
+    startConversationListener();
+    startIncomingMessageListener();
+
+    if (currentConversationId) {
+      listenToMessages(currentConversationId);
+    }
+
+    lastRealtimeActivity = Date.now();
+    updateConnectionUI();
+    showToast("Realtime connection refreshed.", "success");
+  } catch (error) {
+    console.error("Realtime retry failed:", error);
+    showToast("Could not refresh the realtime connection.", "error");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Retry";
+    }
+  }
 }
 
 function setupAuth() {
@@ -739,6 +841,9 @@ function startIncomingMessageListener() {
   unsubscribeIncomingMessages = onSnapshot(
     incomingQuery,
     snapshot => {
+      lastRealtimeActivity = Date.now();
+      updateConnectionUI();
+
       if (!incomingMessageReady) {
         incomingMessageReady = true;
         return;
@@ -1046,6 +1151,9 @@ function listenToMessages(conversationId) {
   unsubscribeMessages = onSnapshot(
     q,
     snapshot => {
+      lastRealtimeActivity = Date.now();
+      updateConnectionUI();
+
       const messages = snapshot.docs.map(
         item => ({
           id: item.id,
@@ -1445,6 +1553,11 @@ function cleanup() {
   unsubscribeConversations?.();
   unsubscribeMessages?.();
   unsubscribeIncomingMessages?.();
+
+  if (healthTimer) {
+    clearInterval(healthTimer);
+    healthTimer = null;
+  }
 
   unsubscribeConversations =
     null;
