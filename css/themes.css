@@ -410,3 +410,526 @@ html[data-theme="midnight"] .call-control.off {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+
+/* =========================================================
+   Global theme bridge
+   Loaded last so every UI surface follows the selected theme.
+========================================================= */
+
+:root,
+html[data-theme="emerald"],
+html[data-theme="midnight"],
+html[data-theme="ocean"],
+html[data-theme="rose"],
+html[data-theme="sunset"],
+html[data-theme="lavender"],
+html[data-theme="graphite"] {
+  --bg: var(--theme-bg);
+  --bg-secondary: var(--theme-panel-alt);
+  --panel: var(--theme-panel);
+  --panel-light: var(--theme-panel);
+  --panel-hover: var(--theme-panel-alt);
+  --primary: var(--theme-accent);
+  --primary-hover: color-mix(in srgb, var(--theme-accent) 84%, var(--theme-accent-dark));
+  --primary-dark: var(--theme-accent-dark);
+  --text: var(--theme-text);
+  --text-muted: var(--theme-muted);
+  --text-soft: color-mix(in srgb, var(--theme-muted) 72%, var(--theme-panel));
+  --border: var(--theme-border);
+  --border-light: color-mix(in srgb, var(--theme-border) 72%, var(--theme-text));
+  --success: var(--theme-accent);
+}
+
+/* Main application */
+html,
+body,
+#auth,
+#app,
+#sidebar,
+#chat,
+.sidebar-header,
+.sidebar-footer,
+.chat-header,
+.chat-composer,
+#conversation-list {
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
+}
+
+#app {
+  background:
+    radial-gradient(circle at 15% 15%, color-mix(in srgb, var(--theme-accent) 7%, transparent), transparent 24rem),
+    var(--theme-chat);
+}
+
+#sidebar,
+#conversation-list {
+  background: var(--theme-panel);
+  border-color: var(--theme-border);
+}
+
+.sidebar-header,
+.sidebar-footer,
+.chat-header,
+.chat-composer {
+  background: var(--theme-header);
+  border-color: var(--theme-border);
+}
+
+.sidebar-title,
+.current-user-name,
+.current-user-email,
+.conversation-name,
+.conversation-preview,
+.chat-header-name,
+.chat-header-status,
+.chat-empty,
+.chat-empty-title,
+.message,
+.message-time,
+.composer-input,
+.search-container input,
+.search-results,
+.search-result {
+  color: var(--theme-text);
+}
+
+.current-user-email,
+.conversation-preview,
+.chat-header-status,
+.message-time,
+.chat-empty,
+.incoming-notification-copy span,
+.settings-kicker,
+.settings-panel-description,
+.settings-description {
+  color: var(--theme-muted);
+}
+
+.current-user,
+.conversation,
+.search-result,
+.chat-menu-button,
+.mobile-sidebar-button,
+.chat-back,
+.chat-call-button {
+  background: transparent;
+  color: var(--theme-text);
+}
+
+.current-user:hover,
+.conversation:hover,
+.search-result:hover {
+  background: var(--theme-panel-alt);
+}
+
+.conversation.active {
+  background: var(--theme-accent-soft);
+  border-color: var(--theme-border);
+  box-shadow: inset 3px 0 0 var(--theme-accent);
+}
+
+.conversation-avatar,
+.call-avatar {
+  background: var(--theme-avatar);
+  color: var(--theme-accent-dark);
+}
+
+.search-container input,
+.search-input,
+.composer-input {
+  background: var(--theme-panel);
+  color: var(--theme-text);
+  border-color: var(--theme-border);
+}
+
+.search-container input::placeholder,
+.composer-input::placeholder {
+  color: var(--theme-muted);
+}
+
+.search-container input:focus,
+.search-input:focus,
+.composer-input:focus {
+  border-color: var(--theme-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--theme-accent) 12%, transparent);
+}
+
+.message {
+  background: var(--theme-bubble);
+  color: var(--theme-text);
+  border-color: var(--theme-border);
+}
+
+.message-row.mine .message {
+  background: var(--theme-bubble-mine);
+  color: var(--theme-text);
+}
+
+.composer-send:not(:disabled),
+.btn,
+.sidebar-footer .btn:not(.secondary),
+.status-primary,
+.call-action.accept {
+  background: linear-gradient(135deg, var(--theme-accent), var(--theme-accent-dark));
+  color: #fff;
+}
+
+.composer-send:not(:disabled) {
+  border: 0;
+}
+
+.btn:hover,
+.status-primary:hover,
+.sidebar-footer .btn:not(.secondary):hover {
+  background: linear-gradient(135deg, var(--theme-accent), var(--theme-accent-dark));
+}
+
+.sidebar-footer .btn.secondary,
+.settings-reset,
+.settings-select,
+.settings-badge,
+.status-secondary {
+  background: var(--theme-panel-alt);
+  color: var(--theme-text);
+  border-color: var(--theme-border);
+}
+
+.chat-menu-button:hover,
+.mobile-sidebar-button:hover,
+.chat-back:hover,
+.chat-call-button:hover:not(:disabled) {
+  background: var(--theme-accent-soft);
+  color: var(--theme-accent-dark);
+}
+
+/* Authentication */
+#auth {
+  background:
+    radial-gradient(circle at 10% 10%, color-mix(in srgb, var(--theme-accent) 18%, transparent), transparent 30rem),
+    radial-gradient(circle at 90% 90%, color-mix(in srgb, var(--theme-accent) 8%, transparent), transparent 30rem),
+    var(--theme-bg);
+}
+
+.auth-shell,
+.auth-panel {
+  background: var(--theme-panel);
+  color: var(--theme-text);
+  border-color: var(--theme-border);
+}
+
+.auth-panel-head,
+.auth-field,
+.auth-form,
+.auth-switch,
+.auth-bottom-note,
+.auth-label,
+.auth-title,
+.auth-subtitle,
+.auth-hint,
+.auth-password-note {
+  color: var(--theme-text);
+}
+
+.auth-subtitle,
+.auth-hint,
+.auth-password-note,
+.auth-switch,
+.auth-bottom-note {
+  color: var(--theme-muted);
+}
+
+.auth-input-wrap,
+.auth-input-wrap input,
+.auth-input-wrap .input,
+.auth-form .input {
+  background: var(--theme-panel-alt);
+  color: var(--theme-text);
+  border-color: var(--theme-border);
+}
+
+.auth-input-wrap input::placeholder,
+.auth-form .input::placeholder {
+  color: var(--theme-muted);
+}
+
+.auth-input-wrap:focus-within {
+  border-color: var(--theme-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--theme-accent) 12%, transparent);
+}
+
+.auth-password-toggle,
+.auth-switch button {
+  color: var(--theme-accent-dark);
+}
+
+.auth-error {
+  background: color-mix(in srgb, #e5484d 12%, var(--theme-panel));
+  border-color: color-mix(in srgb, #e5484d 30%, var(--theme-border));
+}
+
+.auth-terms {
+  background: var(--theme-accent-soft);
+  color: var(--theme-accent-dark);
+}
+
+/* Settings modal */
+.settings-modal {
+  background: color-mix(in srgb, #071014 68%, transparent);
+}
+
+.settings-card,
+.settings-main,
+.settings-panel-card {
+  background: var(--theme-panel);
+  color: var(--theme-text);
+  border-color: var(--theme-border);
+}
+
+.settings-sidebar {
+  background: var(--theme-panel-alt);
+  border-color: var(--theme-border);
+}
+
+.settings-sidebar-title,
+.settings-title,
+.settings-panel-title,
+.settings-label,
+.settings-option-label {
+  color: var(--theme-text);
+}
+
+.settings-sidebar-subtitle,
+.settings-sidebar-footer,
+.settings-kicker,
+.settings-panel-description,
+.settings-description {
+  color: var(--theme-muted);
+}
+
+.settings-header {
+  background: var(--theme-header);
+  border-color: var(--theme-border);
+}
+
+.settings-nav-item {
+  color: var(--theme-muted);
+}
+
+.settings-nav-item:hover {
+  background: var(--theme-panel);
+  color: var(--theme-text);
+}
+
+.settings-nav-item.active {
+  background: var(--theme-panel);
+  color: var(--theme-accent-dark);
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--theme-accent) 10%, transparent);
+}
+
+.settings-row {
+  border-color: var(--theme-border);
+}
+
+.settings-icon {
+  background: var(--theme-accent-soft);
+  color: var(--theme-accent-dark);
+}
+
+.settings-switch {
+  background: var(--theme-border);
+}
+
+.settings-switch.active {
+  background: var(--theme-accent);
+}
+
+.settings-select,
+.settings-reset {
+  background: var(--theme-panel-alt);
+  color: var(--theme-text);
+  border-color: var(--theme-border);
+}
+
+.settings-reset:hover {
+  background: var(--theme-accent-soft);
+}
+
+.settings-close {
+  color: var(--theme-muted);
+}
+
+.settings-close:hover {
+  background: var(--theme-panel-alt);
+}
+
+.settings-badge {
+  background: var(--theme-accent-soft);
+  color: var(--theme-accent-dark);
+}
+
+/* Notifications, connection UI and popups */
+.incoming-notification,
+#connection-banner,
+.toast {
+  color: var(--theme-text);
+  border-color: var(--theme-border);
+}
+
+.incoming-notification,
+#connection-banner {
+  background: color-mix(in srgb, var(--theme-panel) 96%, transparent);
+}
+
+.incoming-notification-avatar,
+#connection-dot {
+  background: var(--theme-accent);
+}
+
+#connection-retry {
+  background: var(--theme-accent-soft);
+  color: var(--theme-accent-dark);
+}
+
+.incoming-notification-close {
+  color: var(--theme-muted);
+}
+
+/* Calls */
+.call-modal,
+.status-composer {
+  background: color-mix(in srgb, #000 60%, transparent);
+}
+
+.incoming-call-card,
+.status-composer-card {
+  background: var(--theme-panel);
+  color: var(--theme-text);
+  border-color: var(--theme-border);
+}
+
+.incoming-call-name {
+  color: var(--theme-text);
+}
+
+.incoming-call-type {
+  color: var(--theme-muted);
+}
+
+.call-avatar {
+  background: var(--theme-avatar);
+  color: var(--theme-accent-dark);
+}
+
+.call-action.accept {
+  background: var(--theme-accent);
+}
+
+.call-control {
+  background: color-mix(in srgb, var(--theme-text) 34%, var(--theme-panel));
+  color: var(--theme-panel);
+}
+
+.call-control.off {
+  background: var(--theme-panel);
+  color: var(--theme-text);
+}
+
+.active-call,
+.remote-video {
+  background: #000;
+}
+
+/* Status UI */
+.status-section {
+  background: var(--theme-panel-alt);
+  border-color: var(--theme-border);
+}
+
+.status-heading,
+.status-subheading,
+.status-copy span,
+.status-empty {
+  color: var(--theme-muted);
+}
+
+.status-item {
+  color: var(--theme-text);
+}
+
+.status-item:hover {
+  background: var(--theme-accent-soft);
+}
+
+.status-avatar {
+  background: linear-gradient(145deg, var(--theme-accent), var(--theme-accent-dark));
+}
+
+.status-ring {
+  border-color: var(--theme-accent);
+  box-shadow: 0 0 0 3px var(--theme-panel), 0 0 0 5px color-mix(in srgb, var(--theme-accent) 18%, transparent);
+}
+
+.status-count {
+  background: var(--theme-accent-dark);
+}
+
+.status-composer textarea {
+  background: var(--theme-panel-alt);
+  color: var(--theme-text);
+  border-color: var(--theme-border);
+}
+
+.status-secondary {
+  background: var(--theme-panel-alt);
+  color: var(--theme-text);
+}
+
+.status-primary {
+  background: var(--theme-accent);
+}
+
+/* Theme picker itself */
+.theme-option {
+  border-color: var(--theme-border);
+  background: var(--theme-panel);
+  color: var(--theme-text);
+}
+
+.theme-option:hover {
+  background: var(--theme-panel-alt);
+  border-color: var(--theme-accent);
+}
+
+.theme-option.active {
+  border-color: var(--theme-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent) 14%, transparent);
+}
+
+.theme-option-description {
+  color: var(--theme-muted);
+}
+
+.theme-option-check {
+  color: var(--theme-accent);
+}
+
+/* Keep disabled controls readable in every theme. */
+button:disabled,
+input:disabled,
+textarea:disabled,
+select:disabled {
+  filter: none;
+}
+
+html[data-theme="midnight"] {
+  --theme-header: rgba(17,24,32,.96);
+}
+
+/* Ensure native form controls follow dark themes. */
+html[data-theme="midnight"] input,
+html[data-theme="midnight"] textarea,
+html[data-theme="midnight"] select {
+  color-scheme: dark;
+}
