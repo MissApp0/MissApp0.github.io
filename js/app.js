@@ -1,6 +1,7 @@
 import { auth, db } from "./firebase.js";
 import { state } from "./state.js";
 import { playSound, getSoundSettings, updateSoundSettings, resetSoundSettings, unlockAudio } from "./sounds.js";
+import { initTheme, getTheme, setTheme, themeOptions } from "./themes.js";
 
 import { login } from "./auth/login.js";
 import { register } from "./auth/register.js";
@@ -60,6 +61,7 @@ document.addEventListener("DOMContentLoaded", init, { once: true });
 
 function init() {
   try {
+    initTheme();
     createAuthUI();
     createAppUI();
     setupEvents();
@@ -1755,19 +1757,74 @@ function openSettings() {
         ${settingsRow("☎", "Incoming calls", "Incoming-call alert.", "sound-incomingCall", s.incomingCall)}
         ${settingsRow("✓", "Call connected", "Confirmation when connected.", "sound-callConnected", s.callConnected)}
       </div>
-      <div class="settings-section"><div class="settings-section-title">App</div><div class="settings-row"><div class="settings-icon">🌐</div><div class="settings-copy"><div class="settings-label">Language</div><div class="settings-description">Interface language</div></div><select class="settings-select" disabled><option>English</option></select></div><div class="settings-row"><div class="settings-icon">↻</div><div class="settings-copy"><div class="settings-label">Hard refresh</div><div class="settings-description">Clear cached app resources and reload MissApp.</div></div><button id="settings-hard-refresh" class="settings-reset" type="button">Refresh</button></div></div>
+      <div class="settings-section">
+        <div class="settings-section-title">Appearance</div>
+        <div class="settings-row">
+          <div class="settings-icon">🎨</div>
+          <div class="settings-copy">
+            <div class="settings-label">Theme</div>
+            <div class="settings-description">Choose the look and colors of MissApp.</div>
+          </div>
+        </div>
+        <div id="theme-picker" class="theme-picker" aria-label="Theme selection"></div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">App</div>
+        <div class="settings-row"><div class="settings-icon">🌐</div><div class="settings-copy"><div class="settings-label">Language</div><div class="settings-description">Interface language</div></div><select class="settings-select" disabled><option>English</option></select></div>
+        <div class="settings-row"><div class="settings-icon">↻</div><div class="settings-copy"><div class="settings-label">Hard refresh</div><div class="settings-description">Clear cached app resources and reload MissApp.</div></div><button id="settings-hard-refresh" class="settings-reset" type="button">Refresh</button></div>
+      </div>
       <div class="settings-footer"><button id="settings-reset" class="settings-reset" type="button">Reset sound settings</button></div>
     </div>
   `;
   document.body.appendChild(modal);
+  renderThemePicker();
   unlockAudio();
   setupSettingsEvents();
+}
+
+function renderThemePicker() {
+  const picker = document.getElementById("theme-picker");
+  if (!picker) return;
+
+  const activeTheme = getTheme();
+  picker.innerHTML = themeOptions().map(theme => {
+    const swatch = {
+      emerald: "#12a884",
+      midnight: "#25d4a5",
+      ocean: "#1687d9",
+      rose: "#d94f83",
+      sunset: "#e87532",
+      lavender: "#8559d6",
+      graphite: "#4d5963"
+    }[theme.id] || "#12a884";
+
+    return '<button type="button" class="theme-option ' +
+      (theme.id === activeTheme ? "active" : "") +
+      '" data-theme-id="' + escapeHTML(theme.id) +
+      '" aria-pressed="' + (theme.id === activeTheme) +
+      '" title="' + escapeHTML(theme.name) + '">' +
+      '<span class="theme-swatch" style="--swatch:' + swatch + '"></span>' +
+      '<span class="theme-option-copy"><span class="theme-option-name">' +
+      escapeHTML(theme.icon) + " " + escapeHTML(theme.name) +
+      '</span><span class="theme-option-description">' +
+      escapeHTML(theme.description) +
+      '</span></span>' +
+      (theme.id === activeTheme ? '<span class="theme-option-check">✓</span>' : "") +
+      '</button>';
+  }).join("");
 }
 
 function setupSettingsEvents() {
   const modal = document.getElementById("settings-modal");
   if (!modal) return;
   modal.querySelector("#settings-close")?.addEventListener("click", closeSettings);
+  modal.querySelectorAll(".theme-option").forEach(button => {
+    button.addEventListener("click", () => {
+      setTheme(button.dataset.themeId);
+      renderThemePicker();
+      setupSettingsEvents();
+    });
+  });
   modal.querySelector("#settings-test-sound")?.addEventListener("click", async () => { await unlockAudio(); playSound("messageReceived"); });
   modal.querySelector("#settings-reset")?.addEventListener("click", () => { resetSoundSettings(); openSettings(); });
   modal.querySelector("#settings-hard-refresh")?.addEventListener("click", hardRefreshApp);
