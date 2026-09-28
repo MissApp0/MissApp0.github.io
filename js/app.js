@@ -878,8 +878,18 @@ function startIncomingMessageListener() {
       });
     },
     error => {
+      realtimeHealthy = false;
+      updateConnectionUI();
       console.error("Incoming message listener error:", error);
-      showToast("Incoming notifications are unavailable. Publish the latest Firestore rules.", "error");
+
+      const code = error?.code || "unknown";
+      const message = error?.message || "Unknown Firestore error";
+      console.error("Incoming message Firestore details:", { code, message });
+
+      showToast(
+        "Incoming messages unavailable (" + code + "). Check Firebase rules/indexes.",
+        "error"
+      );
     }
   );
 }
