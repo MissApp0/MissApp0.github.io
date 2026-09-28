@@ -47,13 +47,18 @@ let isSending = false;
 let currentConversationId = null;
 let messageListenerReady = false;
 
-document.addEventListener("DOMContentLoaded", init);
+document.addEventListener("DOMContentLoaded", init, { once: true });
 
 function init() {
-  createAuthUI();
-  createAppUI();
-  setupEvents();
-  setupAuth();
+  try {
+    createAuthUI();
+    createAppUI();
+    setupEvents();
+    setupAuth();
+  } catch (error) {
+    console.error("MissApp initialization error:", error);
+    showFatalAuthError("MissApp could not start correctly. Refresh the page and try again.");
+  }
 }
 
 function createAuthUI() {
@@ -67,7 +72,8 @@ function createAuthUI() {
   container.innerHTML = `
     <div class="auth-card">
       <div class="auth-title">MissApp</div>
-      <div class="auth-subtitle">Secure real-time messaging</div>\n      <div id="auth-error" class="auth-error hidden" role="alert"></div>
+      <div class="auth-subtitle">Secure real-time messaging</div>
+      <div id="auth-error" class="auth-error hidden" role="alert"></div>
 
       <form id="login-form" class="auth-form">
         <div class="auth-field">
@@ -248,18 +254,31 @@ function setupEvents() {
 }
 
 function setupAuth() {
-  onAuthStateChanged(auth, async user => {
-    state.user = user;
-    state.me = user;
+  let authResolved = false;
 
-    if (!user) {
-      cleanup();
-      state.currentConversation = null;
-      showAuth();
-      return;
+  const authTimeout = setTimeout(() => {
+    if (!authResolved && !state.user) {
+      setAuthLoading(false);
+      showAuthError("Firebase authentication is taking too long. Check your connection and refresh.");
     }
+  }, 10000);
+
+  onAuthStateChanged(auth, async user => {
+    authResolved = true;
+    clearTimeout(authTimeout);
+    setAuthLoading(false);
 
     try {
+      state.user = user;
+      state.me = user;
+
+      if (!user) {
+        cleanup();
+        state.currentConversation = null;
+        showAuth();
+        return;
+      }
+
       showApp();
       await ensureUserDocument(user);
       await loadCurrentUser(user);
@@ -267,9 +286,35 @@ function setupAuth() {
       initCalls();
     } catch (error) {
       console.error("Application startup error:", error);
-      showToast("Could not initialize your account.", "error");
+      showApp();
+      showToast(getFirestoreError(error), "error");
     }
+  }, error => {
+    authResolved = true;
+    clearTimeout(authTimeout);
+    setAuthLoading(false);
+    console.error("Auth state listener error:", error);
+    showAuth();
+    showAuthError(getAuthError(error));
   });
+}
+
+function setAuthLoading(loading) {
+  document.getElementById("auth")?.classList.toggle("auth-loading", loading);
+}
+
+function showAuthError(message) {
+  const box = document.getElementById("auth-error");
+  if (box) {
+    box.textContent = message;
+    box.classList.remove("hidden");
+  }
+}
+
+function showFatalAuthError(message) {
+  const auth = document.getElementById("auth");
+  if (!auth) return;
+  auth.innerHTML = '<div class="auth-card auth-fatal"><div class="auth-brand-mark">M</div><div class="auth-title">MissApp</div><div class="auth-subtitle">' + escapeHTML(message) + '</div><button class="btn" type="button" onclick="location.reload()">Refresh</button></div>';
 }
 
 async function ensureUserDocument(user) {
