@@ -104,6 +104,13 @@ service cloud.firestore {
       }
     }
 
+    // Collection-group read rule for MissApp's global incoming-message listener.
+    // app.js queries every messages subcollection with receiver == request.auth.uid.
+    match /{path=**}/messages/{messageId} {
+      allow read: if signedIn()
+        && resource.data.receiver == request.auth.uid;
+    }
+
     match /conversations/{conversationId} {
       // Allow checking whether a new conversation ID already exists.
       // If the document does not exist, there are no participant data to protect.
