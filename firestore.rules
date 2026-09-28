@@ -66,7 +66,10 @@ service cloud.firestore {
     }
 
     match /conversations/{conversationId} {
-      allow read: if isParticipant(resource.data.participants);
+      // Allow checking whether a new conversation ID already exists.
+      // If the document does not exist, there are no participant data to protect.
+      allow read: if !exists(/databases/$(database)/documents/conversations/$(conversationId))
+        || isParticipant(resource.data.participants);
 
       allow create: if signedIn()
         && request.resource.data.participants is list
