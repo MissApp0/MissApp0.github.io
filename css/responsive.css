@@ -347,3 +347,75 @@ button,
   max-width: 100vw;
   overflow-x: hidden;
 }
+
+/* Mobile top-bar interaction fix */
+@media (max-width: 768px) {
+  #chat {
+    position: relative;
+    z-index: 30;
+    isolation: isolate;
+  }
+
+  .chat-header {
+    position: relative;
+    z-index: 40;
+    pointer-events: auto;
+    padding-top: max(7px, env(safe-area-inset-top));
+    min-height: calc(60px + env(safe-area-inset-top));
+  }
+
+  .chat-header button,
+  .chat-header .conversation-avatar,
+  .chat-call-actions {
+    position: relative;
+    z-index: 41;
+    pointer-events: auto;
+  }
+
+  /* The conversation drawer sits above the chat only while it is open. */
+  #sidebar {
+    z-index: 100;
+  }
+
+  #sidebar:not(.open) {
+    pointer-events: none;
+  }
+
+  #sidebar.open {
+    pointer-events: auto;
+  }
+
+  .chat-menu-button,
+  .chat-back,
+  .chat-call-button {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .chat-call-button:disabled {
+    pointer-events: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .chat-header {
+    gap: 7px;
+    padding-left: max(7px, env(safe-area-inset-left));
+    padding-right: max(7px, env(safe-area-inset-right));
+  }
+
+  .chat-header .conversation-avatar {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+  }
+
+  .chat-header-info {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .chat-call-actions {
+    flex-shrink: 0;
+  }
+}
