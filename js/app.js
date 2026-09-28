@@ -296,6 +296,7 @@ function setupAuth() {
       await loadCurrentUser(user);
       startConversationListener();
       startIncomingMessageListener();
+      setupBrowserNotifications();
       initCalls();
     } catch (error) {
       console.error("Application startup error:", error);
@@ -708,6 +709,22 @@ async function startConversation(otherUserId) {
   }
 }
 
+function setupBrowserNotifications() {
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "default") {
+    document.addEventListener("click", requestBrowserNotifications, { once: true, capture: true });
+  }
+}
+
+async function requestBrowserNotifications() {
+  if (!("Notification" in window) || Notification.permission !== "default") return;
+  try {
+    await Notification.requestPermission();
+  } catch (error) {
+    console.warn("Notification permission request failed:", error);
+  }
+}
+
 function startIncomingMessageListener() {
   unsubscribeIncomingMessages?.();
   incomingMessageReady = false;
@@ -752,7 +769,10 @@ function startIncomingMessageListener() {
         }
       });
     },
-    error => console.error("Incoming message listener error:", error)
+    error => {
+      console.error("Incoming message listener error:", error);
+      showToast("Incoming notifications are unavailable. Publish the latest Firestore rules.", "error");
+    }
   );
 }
 
