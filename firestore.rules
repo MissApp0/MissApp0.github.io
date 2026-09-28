@@ -28,6 +28,35 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /calls/{callId} {
+      allow read: if signedIn()
+        && (resource.data.caller == request.auth.uid
+          || resource.data.callee == request.auth.uid);
+
+      allow create: if signedIn()
+        && request.resource.data.caller == request.auth.uid
+        && request.resource.data.callee is string
+        && request.resource.data.callee != request.auth.uid;
+
+      allow update: if signedIn()
+        && (resource.data.caller == request.auth.uid
+          || resource.data.callee == request.auth.uid)
+        && request.resource.data.caller == resource.data.caller
+        && request.resource.data.callee == resource.data.callee;
+
+      allow delete: if false;
+
+      match /callerCandidates/{candidateId} {
+        allow read, write: if signedIn()
+          && get(/databases/$(database)/documents/calls/$(callId)).data.caller == request.auth.uid;
+      }
+
+      match /calleeCandidates/{candidateId} {
+        allow read, write: if signedIn()
+          && get(/databases/$(database)/documents/calls/$(callId)).data.callee == request.auth.uid;
+      }
+    }
+
     match /conversations/{conversationId} {
       allow read: if isParticipant(resource.data.participants);
 
