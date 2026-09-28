@@ -47,13 +47,21 @@ service cloud.firestore {
       allow delete: if false;
 
       match /callerCandidates/{candidateId} {
-        allow read, write: if signedIn()
+        allow read: if signedIn()
+          && (get(/databases/$(database)/documents/calls/$(callId)).data.caller == request.auth.uid
+            || get(/databases/$(database)/documents/calls/$(callId)).data.callee == request.auth.uid);
+        allow create: if signedIn()
           && get(/databases/$(database)/documents/calls/$(callId)).data.caller == request.auth.uid;
+        allow update, delete: if false;
       }
 
       match /calleeCandidates/{candidateId} {
-        allow read, write: if signedIn()
+        allow read: if signedIn()
+          && (get(/databases/$(database)/documents/calls/$(callId)).data.caller == request.auth.uid
+            || get(/databases/$(database)/documents/calls/$(callId)).data.callee == request.auth.uid);
+        allow create: if signedIn()
           && get(/databases/$(database)/documents/calls/$(callId)).data.callee == request.auth.uid;
+        allow update, delete: if false;
       }
     }
 
