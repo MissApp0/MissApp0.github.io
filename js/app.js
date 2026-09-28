@@ -82,54 +82,124 @@ function createAuthUI() {
   }
 
   container.innerHTML = `
-    <div class="auth-card">
-      <div class="auth-title">MissApp</div>
-      <div class="auth-subtitle">Secure real-time messaging</div>
-      <div id="auth-error" class="auth-error hidden" role="alert"></div>
-
-      <form id="login-form" class="auth-form">
-        <div class="auth-field">
-          <label class="auth-label">Email</label>
-          <input class="input" type="email" name="email" placeholder="Email" autocomplete="email" required>
+    <div class="auth-shell">
+      <section class="auth-showcase" aria-label="MissApp introduction">
+        <div class="auth-brand">
+          <div class="auth-brand-mark" aria-hidden="true">M</div>
+          <span>MissApp</span>
         </div>
 
-        <div class="auth-field">
-          <label class="auth-label">Password</label>
-          <input class="input" type="password" name="password" placeholder="Password" autocomplete="current-password" required>
+        <div class="auth-showcase-copy">
+          <span class="auth-eyebrow"><span></span> Private. Simple. Real-time.</span>
+          <h1>Stay close,<br><strong>wherever you are.</strong></h1>
+          <p>Chat, share moments, and connect with the people who matter in one calm, modern space.</p>
         </div>
 
-        <div class="auth-actions">
-          <button class="btn" type="submit" id="login-button">Login</button>
-        </div>
-      </form>
-
-      <form id="register-form" class="auth-form hidden">
-        <div class="auth-field">
-          <label class="auth-label">Display name</label>
-          <input class="input" type="text" name="displayName" placeholder="Your name" autocomplete="name" minlength="2" maxlength="32" required>
-        </div>
-
-        <div class="auth-field">
-          <label class="auth-label">Email</label>
-          <input class="input" type="email" name="email" placeholder="Email" autocomplete="email" required>
-        </div>
-
-        <div class="auth-field">
-          <label class="auth-label">Password</label>
-          <input class="input" type="password" name="password" placeholder="At least 6 characters" autocomplete="new-password" minlength="6" required>
+        <div class="auth-feature-list">
+          <div class="auth-feature">
+            <span class="auth-feature-icon">✦</span>
+            <div><strong>Instant messaging</strong><small>Fast, real-time conversations</small></div>
+          </div>
+          <div class="auth-feature">
+            <span class="auth-feature-icon">◉</span>
+            <div><strong>Voice & video calls</strong><small>Connect face-to-face</small></div>
+          </div>
+          <div class="auth-feature">
+            <span class="auth-feature-icon">◒</span>
+            <div><strong>Your style</strong><small>Themes that feel like you</small></div>
+          </div>
         </div>
 
-        <div class="auth-actions">
-          <button class="btn" type="submit" id="register-button">Create Account</button>
-        </div>
-      </form>
+        <div class="auth-showcase-footer">Built for everyday conversations.</div>
+      </section>
 
-      <div class="auth-switch">
-        <span id="auth-switch-text">Don't have an account?</span>
-        <button id="auth-switch-button" type="button">Register</button>
-      </div>
+      <section class="auth-panel">
+        <div class="auth-mobile-brand">
+          <div class="auth-brand-mark" aria-hidden="true">M</div>
+          <span>MissApp</span>
+        </div>
+
+        <div class="auth-panel-head">
+          <div class="auth-kicker" id="auth-kicker">WELCOME BACK</div>
+          <div class="auth-title" id="auth-title">Good to see you.</div>
+          <div class="auth-subtitle" id="auth-subtitle">Sign in to continue your conversations.</div>
+        </div>
+
+        <div id="auth-error" class="auth-error hidden" role="alert"></div>
+
+        <form id="login-form" class="auth-form">
+          <div class="auth-field">
+            <label class="auth-label" for="login-email">Email address</label>
+            <div class="auth-input-wrap">
+              <span class="auth-input-icon" aria-hidden="true">✉</span>
+              <input id="login-email" class="input" type="email" name="email" placeholder="you@example.com" autocomplete="email" required>
+            </div>
+          </div>
+
+          <div class="auth-field">
+            <div class="auth-label-row">
+              <label class="auth-label" for="login-password">Password</label>
+              <span class="auth-hint">Keep it private</span>
+            </div>
+            <div class="auth-input-wrap">
+              <span class="auth-input-icon" aria-hidden="true">●</span>
+              <input id="login-password" class="input" type="password" name="password" placeholder="Enter your password" autocomplete="current-password" required>
+              <button class="auth-password-toggle" type="button" data-password-target="login-password" aria-label="Show password">Show</button>
+            </div>
+          </div>
+
+          <div class="auth-actions">
+            <button class="btn auth-submit" type="submit" id="login-button"><span>Login</span><span aria-hidden="true">→</span></button>
+          </div>
+        </form>
+
+        <form id="register-form" class="auth-form hidden">
+          <div class="auth-field">
+            <label class="auth-label" for="register-display-name">Display name</label>
+            <div class="auth-input-wrap">
+              <span class="auth-input-icon" aria-hidden="true">✦</span>
+              <input id="register-display-name" class="input" type="text" name="displayName" placeholder="What should people call you?" autocomplete="name" minlength="2" maxlength="32" required>
+            </div>
+          </div>
+
+          <div class="auth-field">
+            <label class="auth-label" for="register-email">Email address</label>
+            <div class="auth-input-wrap">
+              <span class="auth-input-icon" aria-hidden="true">✉</span>
+              <input id="register-email" class="input" type="email" name="email" placeholder="you@example.com" autocomplete="email" required>
+            </div>
+          </div>
+
+          <div class="auth-field">
+            <label class="auth-label" for="register-password">Password</label>
+            <div class="auth-input-wrap">
+              <span class="auth-input-icon" aria-hidden="true">●</span>
+              <input id="register-password" class="input" type="password" name="password" placeholder="At least 6 characters" autocomplete="new-password" minlength="6" required>
+              <button class="auth-password-toggle" type="button" data-password-target="register-password" aria-label="Show password">Show</button>
+            </div>
+            <div class="auth-password-meter" id="auth-password-meter" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+            <div class="auth-password-note" id="auth-password-note">Use 6+ characters. A longer password is stronger.</div>
+          </div>
+
+          <div class="auth-terms"><span>✓</span> Your account is secured with Firebase Authentication.</div>
+
+          <div class="auth-actions">
+            <button class="btn auth-submit" type="submit" id="register-button"><span>Create account</span><span aria-hidden="true">→</span></button>
+          </div>
+        </form>
+
+        <div class="auth-switch">
+          <span id="auth-switch-text">Don't have an account?</span>
+          <button id="auth-switch-button" type="button">Create one</button>
+        </div>
+
+        <div class="auth-bottom-note"><span class="auth-secure-dot"></span> Secure sign-in · MissApp</div>
+      </section>
     </div>
   `;
+
+  setupPasswordToggles();
+  setupPasswordMeter();
 }
 
 function createAppUI() {
@@ -640,6 +710,40 @@ async function handleRegister(event) {
   }
 }
 
+function setupPasswordToggles() {
+  document.querySelectorAll(".auth-password-toggle").forEach(button => {
+    button.addEventListener("click", () => {
+      const input = document.getElementById(button.dataset.passwordTarget);
+      if (!input) return;
+      const visible = input.type === "text";
+      input.type = visible ? "password" : "text";
+      button.textContent = visible ? "Show" : "Hide";
+      button.setAttribute("aria-label", visible ? "Show password" : "Hide password");
+    });
+  });
+}
+
+function setupPasswordMeter() {
+  const input = document.getElementById("register-password");
+  const meter = document.getElementById("auth-password-meter");
+  const note = document.getElementById("auth-password-note");
+  if (!input || !meter || !note) return;
+
+  input.addEventListener("input", () => {
+    const value = input.value;
+    const score = value.length < 6 ? 0 : Math.min(4,
+      (value.length >= 8 ? 1 : 0) +
+      (/[A-Z]/.test(value) ? 1 : 0) +
+      (/[0-9]/.test(value) ? 1 : 0) +
+      (/[^A-Za-z0-9]/.test(value) ? 1 : 0)
+    );
+    meter.dataset.score = String(score);
+    note.textContent = score <= 1 ? "Use 6+ characters. A longer password is stronger." :
+      score === 2 ? "Good start — add another type of character." :
+      score === 3 ? "Strong password." : "Excellent password strength.";
+  });
+}
+
 function toggleAuth() {
   state.registerMode = !state.registerMode;
 
@@ -657,7 +761,7 @@ function toggleAuth() {
     }
 
     if (button) {
-      button.textContent = "Login";
+      button.textContent = "Log in";
     }
   } else {
     registerForm?.classList.add("hidden");
@@ -668,7 +772,7 @@ function toggleAuth() {
     }
 
     if (button) {
-      button.textContent = "Register";
+      button.textContent = "Create one";
     }
   }
 }
