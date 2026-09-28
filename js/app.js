@@ -1,6 +1,6 @@
 import { auth, db } from "./firebase.js";
 import { state } from "./state.js";
-import { playSound, getSoundSettings, updateSoundSettings, resetSoundSettings } from "./sounds.js";
+import { playSound, getSoundSettings, updateSoundSettings, resetSoundSettings, unlockAudio } from "./sounds.js";
 
 import { login } from "./auth/login.js";
 import { register } from "./auth/register.js";
@@ -1354,6 +1354,7 @@ function openSettings() {
       <div class="settings-header"><div class="settings-title" id="settings-title">Settings</div><button class="settings-close" id="settings-close" type="button" aria-label="Close settings">×</button></div>
       <div class="settings-section">
         <div class="settings-section-title">Sounds & notifications</div>
+        <div class="settings-row"><div class="settings-icon">▶</div><div class="settings-copy"><div class="settings-label">Test sound</div><div class="settings-description">Tap to check that MissApp audio is working.</div></div><button id="settings-test-sound" class="settings-reset" type="button">Play</button></div>
         ${settingsRow("🔊", "Sound effects", "Play MissApp sounds.", "sound-enabled", s.enabled)}
         <div class="settings-row"><div class="settings-icon">🔉</div><div class="settings-copy"><div class="settings-label">Volume</div><div class="settings-description">Notification sound volume</div></div><input id="sound-volume" class="settings-range" type="range" min="0" max="100" value="${Math.round(s.volume * 100)}" aria-label="Sound volume"></div>
         ${settingsRow("✉", "Message sent", "Sound after sending.", "sound-messageSent", s.messageSent)}
@@ -1366,6 +1367,7 @@ function openSettings() {
     </div>
   `;
   document.body.appendChild(modal);
+  unlockAudio();
   setupSettingsEvents();
 }
 
@@ -1373,6 +1375,7 @@ function setupSettingsEvents() {
   const modal = document.getElementById("settings-modal");
   if (!modal) return;
   modal.querySelector("#settings-close")?.addEventListener("click", closeSettings);
+  modal.querySelector("#settings-test-sound")?.addEventListener("click", async () => { await unlockAudio(); playSound("messageReceived"); });
   modal.querySelector("#settings-reset")?.addEventListener("click", () => { resetSoundSettings(); openSettings(); });
   modal.querySelector("#sound-volume")?.addEventListener("input", event => updateSoundSettings({ volume: Number(event.target.value) / 100 }));
   [["sound-enabled","enabled"],["sound-messageSent","messageSent"],["sound-messageReceived","messageReceived"],["sound-incomingCall","incomingCall"],["sound-callConnected","callConnected"]].forEach(([id,key]) => {
