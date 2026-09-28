@@ -45,6 +45,7 @@ let unsubscribeMessages = null;
 let searchTimer = null;
 let isSending = false;
 let currentConversationId = null;
+let messageListenerReady = false;
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -855,6 +856,7 @@ function renderConversationActive() {
 
 function listenToMessages(conversationId) {
   unsubscribeMessages?.();
+  messageListenerReady = false;
 
   const messagesRef = collection(
     db,
@@ -880,10 +882,11 @@ function listenToMessages(conversationId) {
 
       const previousCount = containerMessageCount();
       renderMessages(messages);
-      if (messages.length > previousCount) {
+      if (messageListenerReady && messages.length > previousCount) {
         const latest = messages[messages.length - 1];
         if (latest?.senderId !== state.user?.uid) playSound("messageReceived");
       }
+      messageListenerReady = true;
     },
     error => {
       console.error(
