@@ -9,7 +9,9 @@ import {
   where,
   onSnapshot,
   getDocs,
-  addDoc,
+  getDoc,
+  setDoc,
+  doc,
   serverTimestamp
 } from
   "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -117,114 +119,57 @@ export function listenConversations(render) {
     }
 */
 export async function createConversation(otherUserUid) {
-
-  const currentUserUid =
-    state.user?.uid;
-
+  const currentUserUid = state.user?.uid;
 
   if (!currentUserUid) {
-    throw new Error(
-      "You must be logged in to create a conversation."
-    );
+    throw new Error("You must be logged in to create a conversation.");
   }
 
-
-  if (!otherUserUid) {
-    throw new Error(
-      "A user UID is required."
-    );
+  if (!otherUserUid || currentUserUid === otherUserUid) {
+    throw new Error("Invalid conversation participant.");
   }
 
+  const conversationId = [currentUserUid, otherUserUid].sort().join("__");
+  const conversationRef = doc(db, "conversations", conversationId);
+  const existing = await getDoc(conversationRef);
 
-  if (currentUserUid === otherUserUid) {
-    throw new Error(
-      "You cannot create a conversation with yourself."
-    );
+  if (existing.exists()) {
+    return { id: existing.id, created: false };
   }
 
+  const [meSnapshot, otherSnapshot] = await Promise.all([
+    getDoc(doc(db, "users", currentUserUid)),
+    getDoc(doc(db, "users", otherUserUid))
+  ]);
 
-  /*
-    Look for an existing conversation
-    containing the current user.
-  */
-  const q =
-    query(
-      collection(
-        db,
-        "conversations"
-      ),
+  if (!otherSnapshot.exists()) {
+    throw new Error("User profile not found.");
+  }
 
-      where(
-        "participants",
-        "array-contains",
-        currentUserUid
-      )
-    );
-
-
-  const snapshot =
-    await getDocs(q);
-
-
-  /*
-    Check client-side that the conversation
-    contains exactly these two users.
-  */
-  const existing =
-    snapshot.docs.find(
-      doc => {
-
-        const participants =
-          doc.data().participants || [];
-
-
-        return (
-          participants.length === 2 &&
-          participants.includes(otherUserUid)
-        );
-
-      }
-    );
-
-
-  if (existing) {
-
+  const profile = snapshot => {
+    const data = snapshot.data() || {};
     return {
-      id: existing.id,
-      created: false
+      uid: snapshot.id,
+      username: data.username || "",
+      displayName: data.displayName || data.username || "",
+      email: data.email || ""
     };
-
-  }
-
-
-  /*
-    Create a new conversation.
-  */
-  const conversationRef =
-    await addDoc(
-      collection(
-        db,
-        "conversations"
-      ),
-
-      {
-        participants: [
-          currentUserUid,
-          otherUserUid
-        ],
-
-        createdAt:
-          serverTimestamp(),
-
-        lastMessageAt:
-          serverTimestamp()
-      }
-    );
-
-
-  return {
-    id: conversationRef.id,
-    created: true
   };
 
+  const me = meSnapshot.exists() ? profile(meSnapshot) : { uid: currentUserUid };
+  const other = profile(otherSnapshot);
+
+  await setDoc(conversationRef, {
+    participants: [currentUserUid, otherUserUid],
+    participantData: {
+      [currentUserUid]: me,
+      [otherUserUid]: other
+    },
+    lastMessage: "",
+    lastMessageAt: serverTimestamp(),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+
+  return { id: conversationId, created: true };
 }
