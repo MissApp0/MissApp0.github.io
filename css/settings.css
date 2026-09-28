@@ -78,3 +78,57 @@
   .settings-modal { padding:0; align-items:flex-end; }
   .settings-card { width:100%; max-height:92dvh; border-radius:18px 18px 0 0; }
 }
+
+
+/* Premium settings polish */
+.settings-modal {
+  background:rgba(7,16,20,.58);
+  backdrop-filter:blur(12px);
+}
+.settings-card {
+  border:1px solid rgba(255,255,255,.7);
+  border-radius:22px;
+  background:linear-gradient(180deg,#fff,#fbfcfc);
+  box-shadow:0 30px 90px rgba(0,0,0,.28);
+}
+.settings-header {
+  padding:20px 22px;
+  background:linear-gradient(180deg,#fff,#f8fafb);
+}
+.settings-title {
+  font-size:21px;
+  font-weight:750;
+  letter-spacing:-.025em;
+}
+.settings-section { padding-left:22px; padding-right:22px; }
+.settings-section-title {
+  color:#087f66;
+  font-size:11px;
+  letter-spacing:.09em;
+}
+.settings-row {
+  min-height:62px;
+  border-bottom-color:#edf1f2;
+}
+.settings-icon {
+  background:#eef6f4;
+  color:#087f66;
+}
+.settings-description { color:#7a8990; }
+.settings-switch.active { background:#12a884; box-shadow:0 3px 10px rgba(18,168,132,.18); }
+.settings-range { accent-color:#12a884; }
+.settings-select {
+  border-color:#dbe4e7;
+  border-radius:10px;
+}
+.settings-footer {
+  padding:14px 22px 18px;
+  background:#fafcfc;
+}
+.settings-reset {
+  border:1px solid #e0e7e9;
+  border-radius:10px;
+}
+@media(max-width:600px) {
+  .settings-card { border-radius:22px 22px 0 0; }
+}
