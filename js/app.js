@@ -16,11 +16,10 @@ import {
   setDoc,
   serverTimestamp,
   collection,
-  collectionGroup,
   addDoc,
   query,
   orderBy,
-  where,
+  limit,
   onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
@@ -50,6 +49,8 @@ let currentConversationId = null;
 let messageListenerReady = false;
 let unsubscribeIncomingMessages = null;
 let incomingMessageReady = false;
+const notificationConversationListeners = new Map();
+const notificationConversationReady = new Set();
 let networkOnline = navigator.onLine;
 let lastRealtimeActivity = 0;
 let healthTimer = null;
@@ -830,68 +831,155 @@ async function requestBrowserNotifications() {
 }
 
 function startIncomingMessageListener() {
-  unsubscribeIncomingMessages?.();
+  stopIncomingMessageListeners();
   incomingMessageReady = false;
 
   if (!state.user) return;
 
-  const incomingQuery = query(
-    collectionGroup(db, "messages"),
-    where("receiver", "==", state.user.uid)
-  );
+  // Do not use a collection-group query here. Each conversation is already
+  // authorized for its participants by the normal conversation/messages rule.
+  syncIncomingMessageListeners(state.conversationDocs || []);
 
-  unsubscribeIncomingMessages = onSnapshot(
-    incomingQuery,
-    snapshot => {
-      lastRealtimeActivity = Date.now();
-      realtimeHealthy = true;
-      updateConnectionUI();
+  // Conversation updates will call this again through renderConversations().
+  incomingMessageReady = true;
+}
 
-      if (!incomingMessageReady) {
-        incomingMessageReady = true;
-        return;
-      }
+function syncIncomingMessageListeners(docs) {
+  if (!state.user) return;
 
-      snapshot.docChanges().forEach(change => {
-        if (change.type !== "added") return;
+  const activeIds = new Set();
 
-        const message = { id: change.doc.id, ...change.doc.data() };
-        if (!message.senderId || message.senderId === state.user?.uid) return;
+  (docs || []).forEach(item => {
+    const data =
+      typeof item.data === "function"
+        ? item.data()
+        : item;
 
-        const conversationId = change.doc.ref.parent.parent?.id;
-        const senderName = message.senderName || "New message";
-        const preview = String(message.text || "").trim();
+    const conversationId = item?.id;
 
-        playSound("messageReceived");
-        showIncomingMessageNotification(senderName, preview, conversationId);
+    if (!conversationId || !Array.isArray(data?.participants)) return;
+    if (!data.participants.includes(state.user.uid)) return;
 
-        if (document.hidden && "Notification" in window && Notification.permission === "granted") {
-          try {
-            new Notification(senderName, {
-              body: preview || "Sent you a message",
-              tag: conversationId || message.id
-            });
-          } catch (error) {
-            console.warn("Browser notification failed:", error);
-          }
+    activeIds.add(conversationId);
+
+    if (notificationConversationListeners.has(conversationId)) return;
+
+    const messagesRef = collection(
+      db,
+      "conversations",
+      conversationId,
+      "messages"
+    );
+
+    const latestMessageQuery = query(
+      messagesRef,
+      orderBy("createdAt", "desc"),
+      limit(1)
+    );
+
+    let ready = false;
+
+    const unsubscribe = onSnapshot(
+      latestMessageQuery,
+      snapshot => {
+        lastRealtimeActivity = Date.now();
+        realtimeHealthy = true;
+        updateConnectionUI();
+
+        const latest = snapshot.docs[0];
+
+        if (!latest) {
+          ready = true;
+          notificationConversationReady.add(conversationId);
+          return;
         }
-      });
-    },
-    error => {
-      realtimeHealthy = false;
-      updateConnectionUI();
-      console.error("Incoming message listener error:", error);
 
-      const code = error?.code || "unknown";
-      const message = error?.message || "Unknown Firestore error";
-      console.error("Incoming message Firestore details:", { code, message });
+        const message = {
+          id: latest.id,
+          ...latest.data()
+        };
 
-      showToast(
-        "Incoming messages unavailable (" + code + "). Check Firebase rules/indexes.",
-        "error"
-      );
+        if (!ready) {
+          ready = true;
+          notificationConversationReady.add(conversationId);
+          return;
+        }
+
+        if (
+          message.senderId &&
+          message.senderId !== state.user.uid
+        ) {
+          notifyForIncomingMessage(conversationId, message);
+        }
+      },
+      error => {
+        realtimeHealthy = false;
+        updateConnectionUI();
+        console.error(
+          "Conversation notification listener error:",
+          conversationId,
+          error
+        );
+      }
+    );
+
+    notificationConversationListeners.set(conversationId, unsubscribe);
+  });
+
+  for (const [conversationId, unsubscribe] of notificationConversationListeners) {
+    if (!activeIds.has(conversationId)) {
+      unsubscribe?.();
+      notificationConversationListeners.delete(conversationId);
+      notificationConversationReady.delete(conversationId);
     }
+  }
+}
+
+function notifyForIncomingMessage(conversationId, message) {
+  // The active chat already has its own message listener and sound.
+  // Avoid showing a duplicate notification while the user is reading it.
+  if (
+    currentConversationId === conversationId &&
+    !document.hidden
+  ) {
+    return;
+  }
+
+  const senderName = message.senderName || "New message";
+  const preview = String(message.text || "").trim();
+
+  playSound("messageReceived");
+  showIncomingMessageNotification(
+    senderName,
+    preview,
+    conversationId
   );
+
+  if (
+    document.hidden &&
+    "Notification" in window &&
+    Notification.permission === "granted"
+  ) {
+    try {
+      new Notification(senderName, {
+        body: preview || "Sent you a message",
+        tag: conversationId || message.id
+      });
+    } catch (error) {
+      console.warn("Browser notification failed:", error);
+    }
+  }
+}
+
+function stopIncomingMessageListeners() {
+  for (const unsubscribe of notificationConversationListeners.values()) {
+    unsubscribe?.();
+  }
+
+  notificationConversationListeners.clear();
+  notificationConversationReady.clear();
+  unsubscribeIncomingMessages = null;
+  incomingMessageReady = false;
 }
 
 function showIncomingMessageNotification(senderName, preview, conversationId) {
@@ -945,6 +1033,9 @@ function startConversationListener() {
 }
 
 function renderConversations(docs) {
+  state.conversationDocs = docs || [];
+  syncIncomingMessageListeners(state.conversationDocs);
+
   const list = document.getElementById("conversation-list");
 
   if (!list) return;
@@ -1567,7 +1658,7 @@ function setButtonLoading(
 function cleanup() {
   unsubscribeConversations?.();
   unsubscribeMessages?.();
-  unsubscribeIncomingMessages?.();
+  stopIncomingMessageListeners();
 
   if (healthTimer) {
     clearInterval(healthTimer);
