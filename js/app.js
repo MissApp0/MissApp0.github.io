@@ -1371,6 +1371,9 @@ function getFirestoreError(error) {
     case "unauthenticated":
       return "Please log in again.";
 
+    case "permission-denied":
+      return "Firebase denied this action. Deploy the latest firestore.rules to your Firebase project.";
+
     default:
       return (
         error?.message ||
