@@ -188,7 +188,14 @@ async function answerCall(call) {
 function listenForAnswer(callId, peer) {
   const unsub = onSnapshot(doc(db, "calls", callId), async snapshot => {
     const data = snapshot.data();
-    if (!data || !data.answer || peer.currentRemoteDescription) return;
+    if (!data) return;
+
+    if (data.status === "declined" || data.status === "ended") {
+      endActiveCall(false);
+      return;
+    }
+
+    if (!data.answer || peer.currentRemoteDescription) return;
 
     try {
       await peer.setRemoteDescription(new RTCSessionDescription(data.answer));
