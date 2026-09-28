@@ -1,5 +1,6 @@
 import { auth, db } from "./firebase.js";
 import { state } from "./state.js";
+import { playSound, getSoundSettings, updateSoundSettings, resetSoundSettings } from "./sounds.js";
 
 import { login } from "./auth/login.js";
 import { register } from "./auth/register.js";
@@ -212,6 +213,7 @@ function setupEvents() {
   document.getElementById("register-form")?.addEventListener("submit", handleRegister);
   document.getElementById("auth-switch-button")?.addEventListener("click", toggleAuth);
   document.getElementById("logout-button")?.addEventListener("click", handleLogout);
+  document.getElementById("settings-button")?.addEventListener("click", openSettings);
   document.getElementById("user-search")?.addEventListener("input", handleSearch);
   document.getElementById("open-sidebar")?.addEventListener("click", openSidebar);
   document.getElementById("close-sidebar")?.addEventListener("click", closeSidebar);
@@ -873,7 +875,12 @@ function listenToMessages(conversationId) {
         })
       );
 
+      const previousCount = containerMessageCount();
       renderMessages(messages);
+      if (messages.length > previousCount) {
+        const latest = messages[messages.length - 1];
+        if (latest?.senderId !== state.user?.uid) playSound("messageReceived");
+      }
     },
     error => {
       console.error(
@@ -1027,6 +1034,8 @@ async function handleSendMessage(event) {
     );
 
     input.value = "";
+
+    playSound("messageSent");
 
     updateMessageCounter();
     resetTextareaHeight();
@@ -1319,6 +1328,54 @@ function showToast(
     );
   }, 3500);
 }
+
+function containerMessageCount() {
+  return document.querySelectorAll("#messages .message-row").length;
+}
+
+function settingsRow(icon, label, description, id, enabled) {
+  return `<div class="settings-row"><div class="settings-icon">${icon}</div><div class="settings-copy"><div class="settings-label">${label}</div><div class="settings-description">${description}</div></div><button id="${id}" class="settings-switch ${enabled ? "active" : ""}" type="button" role="switch" aria-checked="${enabled}"></button></div>`;
+}
+
+function openSettings() {
+  closeSettings();
+  const s = getSoundSettings();
+  const modal = document.createElement("div");
+  modal.className = "settings-modal";
+  modal.id = "settings-modal";
+  modal.innerHTML = `
+    <div class="settings-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="settings-header"><div class="settings-title" id="settings-title">Settings</div><button class="settings-close" id="settings-close" type="button" aria-label="Close settings">×</button></div>
+      <div class="settings-section">
+        <div class="settings-section-title">Sounds & notifications</div>
+        ${settingsRow("🔊", "Sound effects", "Play MissApp sounds.", "sound-enabled", s.enabled)}
+        <div class="settings-row"><div class="settings-icon">🔉</div><div class="settings-copy"><div class="settings-label">Volume</div><div class="settings-description">Notification sound volume</div></div><input id="sound-volume" class="settings-range" type="range" min="0" max="100" value="${Math.round(s.volume * 100)}" aria-label="Sound volume"></div>
+        ${settingsRow("✉", "Message sent", "Sound after sending.", "sound-messageSent", s.messageSent)}
+        ${settingsRow("💬", "Message received", "Sound for incoming messages.", "sound-messageReceived", s.messageReceived)}
+        ${settingsRow("☎", "Incoming calls", "Incoming-call alert.", "sound-incomingCall", s.incomingCall)}
+        ${settingsRow("✓", "Call connected", "Confirmation when connected.", "sound-callConnected", s.callConnected)}
+      </div>
+      <div class="settings-section"><div class="settings-section-title">App</div><div class="settings-row"><div class="settings-icon">🌐</div><div class="settings-copy"><div class="settings-label">Language</div><div class="settings-description">Interface language</div></div><select class="settings-select" disabled><option>English</option></select></div></div>
+      <div class="settings-footer"><button id="settings-reset" class="settings-reset" type="button">Reset sound settings</button></div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  setupSettingsEvents();
+}
+
+function setupSettingsEvents() {
+  const modal = document.getElementById("settings-modal");
+  if (!modal) return;
+  modal.querySelector("#settings-close")?.addEventListener("click", closeSettings);
+  modal.querySelector("#settings-reset")?.addEventListener("click", () => { resetSoundSettings(); openSettings(); });
+  modal.querySelector("#sound-volume")?.addEventListener("input", event => updateSoundSettings({ volume: Number(event.target.value) / 100 }));
+  [["sound-enabled","enabled"],["sound-messageSent","messageSent"],["sound-messageReceived","messageReceived"],["sound-incomingCall","incomingCall"],["sound-callConnected","callConnected"]].forEach(([id,key]) => {
+    modal.querySelector("#"+id)?.addEventListener("click", event => { const next = !getSoundSettings()[key]; updateSoundSettings({ [key]: next }); event.currentTarget.classList.toggle("active", next); event.currentTarget.setAttribute("aria-checked", String(next)); if (next && key !== "enabled") playSound(key); });
+  });
+  modal.addEventListener("click", event => { if (event.target === modal) closeSettings(); });
+}
+
+function closeSettings() { document.getElementById("settings-modal")?.remove(); }
 
 function getAuthError(error) {
   switch (error?.code) {
