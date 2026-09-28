@@ -177,3 +177,43 @@ button:active {
   box-shadow: 0 14px 35px rgba(0,0,0,.18);
   color: #fff;
 }
+
+
+/* Top incoming message notifications */
+#incoming-notifications {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+  z-index: 10000; width: min(460px, calc(100vw - 24px));
+  display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+}
+.incoming-notification {
+  width: 100%; display: grid; grid-template-columns: 42px 1fr 24px;
+  align-items: center; gap: 10px; padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,.75); border-radius: 16px;
+  background: rgba(255,255,255,.96); color: var(--text);
+  box-shadow: 0 14px 40px rgba(20,35,42,.20); text-align: left;
+  pointer-events: auto; animation: incoming-notification-in .24s ease;
+  backdrop-filter: blur(14px);
+}
+.incoming-notification:hover { transform: translateY(-1px); }
+.incoming-notification.is-leaving { animation: incoming-notification-out .22s ease forwards; }
+.incoming-notification-avatar {
+  width: 42px; height: 42px; display: grid; place-items: center;
+  border-radius: 50%; background: var(--primary); color: #fff; font-weight: 800;
+}
+.incoming-notification-copy { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.incoming-notification-copy strong, .incoming-notification-copy span {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.incoming-notification-copy strong { font-size: 14px; }
+.incoming-notification-copy span { color: var(--text-muted); font-size: 13px; }
+.incoming-notification-close { color: var(--text-soft); font-size: 20px; text-align: center; }
+@keyframes incoming-notification-in {
+  from { opacity: 0; transform: translateY(-12px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes incoming-notification-out {
+  to { opacity: 0; transform: translateY(-10px) scale(.98); }
+}
+@media (max-width: 600px) {
+  #incoming-notifications { top: 8px; width: calc(100vw - 16px); }
+}
