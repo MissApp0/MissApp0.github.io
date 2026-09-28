@@ -1,4 +1,5 @@
 import { auth, db } from "./firebase.js";
+import { turnConfig } from "./config.js";
 import {
   addDoc,
   collection,
@@ -17,9 +18,18 @@ const rtcConfig = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "stun:stun.cloudflare.com:3478" }
+    { urls: "stun:stun.cloudflare.com:3478" },
+    ...(turnConfig.urls?.length && turnConfig.username && turnConfig.credential
+      ? [{
+          urls: turnConfig.urls,
+          username: turnConfig.username,
+          credential: turnConfig.credential
+        }]
+      : [])
   ],
-  iceCandidatePoolSize: 10
+  iceCandidatePoolSize: 10,
+  bundlePolicy: "max-bundle",
+  rtcpMuxPolicy: "require"
 };
 
 let activeCall = null;
