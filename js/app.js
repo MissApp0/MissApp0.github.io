@@ -33,6 +33,12 @@ import {
   createConversation
 } from "./chat/conversations.js";
 
+import {
+  initCalls,
+  startCall,
+  endActiveCall
+} from "./call.js";
+
 let unsubscribeConversations = null;
 let unsubscribeMessages = null;
 let searchTimer = null;
