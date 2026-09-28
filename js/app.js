@@ -16,9 +16,11 @@ import {
   setDoc,
   serverTimestamp,
   collection,
+  collectionGroup,
   addDoc,
   query,
   orderBy,
+  where,
   onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
@@ -46,6 +48,8 @@ let searchTimer = null;
 let isSending = false;
 let currentConversationId = null;
 let messageListenerReady = false;
+let unsubscribeIncomingMessages = null;
+let incomingMessageReady = false;
 
 document.addEventListener("DOMContentLoaded", init, { once: true });
 
@@ -121,6 +125,14 @@ function createAuthUI() {
 }
 
 function createAppUI() {
+  if (!document.getElementById("incoming-notifications")) {
+    const notifications = document.createElement("div");
+    notifications.id = "incoming-notifications";
+    notifications.setAttribute("aria-live", "polite");
+    notifications.setAttribute("aria-label", "New message notifications");
+    document.body.appendChild(notifications);
+  }
+
   const sidebar = document.getElementById("sidebar");
   const chat = document.getElementById("chat");
 
@@ -283,6 +295,7 @@ function setupAuth() {
       await ensureUserDocument(user);
       await loadCurrentUser(user);
       startConversationListener();
+      startIncomingMessageListener();
       initCalls();
     } catch (error) {
       console.error("Application startup error:", error);
@@ -692,6 +705,95 @@ async function startConversation(otherUserId) {
   } catch (error) {
     console.error("Start conversation error:", error);
     showToast(getFirestoreError(error), "error");
+  }
+}
+
+function startIncomingMessageListener() {
+  unsubscribeIncomingMessages?.();
+  incomingMessageReady = false;
+
+  if (!state.user) return;
+
+  const incomingQuery = query(
+    collectionGroup(db, "messages"),
+    where("receiver", "==", state.user.uid)
+  );
+
+  unsubscribeIncomingMessages = onSnapshot(
+    incomingQuery,
+    snapshot => {
+      if (!incomingMessageReady) {
+        incomingMessageReady = true;
+        return;
+      }
+
+      snapshot.docChanges().forEach(change => {
+        if (change.type !== "added") return;
+
+        const message = { id: change.doc.id, ...change.doc.data() };
+        if (!message.senderId || message.senderId === state.user?.uid) return;
+
+        const conversationId = change.doc.ref.parent.parent?.id;
+        const senderName = message.senderName || "New message";
+        const preview = String(message.text || "").trim();
+
+        playSound("messageReceived");
+        showIncomingMessageNotification(senderName, preview, conversationId);
+
+        if (document.hidden && "Notification" in window && Notification.permission === "granted") {
+          try {
+            new Notification(senderName, {
+              body: preview || "Sent you a message",
+              tag: conversationId || message.id
+            });
+          } catch (error) {
+            console.warn("Browser notification failed:", error);
+          }
+        }
+      });
+    },
+    error => console.error("Incoming message listener error:", error)
+  );
+}
+
+function showIncomingMessageNotification(senderName, preview, conversationId) {
+  const container = document.getElementById("incoming-notifications");
+  if (!container) return;
+
+  const notification = document.createElement("button");
+  notification.type = "button";
+  notification.className = "incoming-notification";
+  notification.innerHTML = `
+    <span class="incoming-notification-avatar">${escapeHTML(getInitial(senderName))}</span>
+    <span class="incoming-notification-copy">
+      <strong>${escapeHTML(senderName)}</strong>
+      <span>${escapeHTML(preview || "Sent you a message")}</span>
+    </span>
+    <span class="incoming-notification-close" aria-hidden="true">×</span>
+  `;
+
+  notification.addEventListener("click", () => {
+    notification.remove();
+    if (conversationId) openConversationById(conversationId);
+  });
+
+  container.prepend(notification);
+  while (container.children.length > 4) container.lastElementChild?.remove();
+
+  setTimeout(() => {
+    notification.classList.add("is-leaving");
+    setTimeout(() => notification.remove(), 220);
+  }, 6000);
+}
+
+async function openConversationById(conversationId) {
+  if (!conversationId || !state.user) return;
+
+  try {
+    const snapshot = await getDoc(doc(db, "conversations", conversationId));
+    if (snapshot.exists()) openConversation({ id: conversationId, data: snapshot.data() });
+  } catch (error) {
+    console.error("Open notification conversation error:", error);
   }
 }
 
@@ -1322,6 +1424,7 @@ function setButtonLoading(
 function cleanup() {
   unsubscribeConversations?.();
   unsubscribeMessages?.();
+  unsubscribeIncomingMessages?.();
 
   unsubscribeConversations =
     null;
