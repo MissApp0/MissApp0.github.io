@@ -1,5 +1,6 @@
 import { auth, db } from "./firebase.js";
 import { turnConfig } from "./config.js";
+import { playSound } from "./sounds.js";
 import {
   addDoc,
   collection,
@@ -105,6 +106,7 @@ function attachPeerMonitoring(peer, call) {
 
     if (peer.connectionState === "connected") {
       clearCallTimeout();
+      playSound("callConnected");
       setCallStatus("Connected");
       logSelectedIceRoute(peer);
       return;
@@ -217,6 +219,7 @@ function listenForIncomingCalls() {
         call.status === "ringing" &&
         !activeCall
       ) {
+        playSound("incomingCall");
         showIncomingCall(call);
       }
     });
