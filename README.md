@@ -331,6 +331,20 @@ cd ..
 firebase deploy --only functions
 ~~~
 
+## 🩺 Realtime connection recovery
+
+MissApp now includes a lightweight connection-health system.
+
+It monitors:
+
+- Browser online/offline state
+- Firestore realtime activity
+- Listener failures
+- Returning to a background tab
+- Reconnection attempts
+
+When a connection becomes unhealthy, a small recovery banner appears with a **Retry** action. Returning to the app can also re-establish the realtime listeners.
+
 ## 🔄 Built-in hard refresh
 
 MissApp includes a built-in **Hard refresh** control under **Settings → App**.
