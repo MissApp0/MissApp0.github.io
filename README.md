@@ -331,6 +331,19 @@ cd ..
 firebase deploy --only functions
 ~~~
 
+## 🔄 Built-in hard refresh
+
+MissApp includes a built-in **Hard refresh** control under **Settings → App**.
+
+It:
+
+- Clears Cache API entries used by the app.
+- Preserves the Firebase Messaging service worker so push notifications keep working.
+- Removes other registered service workers if present.
+- Reloads the application with a cache-busting refresh parameter.
+
+This is useful after a GitHub Pages deployment when an older frontend version appears to be stuck in the browser.
+
 ## 🐛 Troubleshooting
 
 ### Messages work but notifications do not
