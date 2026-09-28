@@ -1930,6 +1930,76 @@ function openSettings() {
   setupSettingsEvents();
 }
 
+function setupSettingsEvents() {
+  const modal = document.getElementById("settings-modal");
+  if (!modal) return;
+
+  const title = modal.querySelector("#settings-title");
+  const labels = { general: "General", sounds: "Sounds & notifications", appearance: "Appearance", app: "App" };
+
+  modal.querySelector("#settings-close")?.addEventListener("click", closeSettings);
+
+  modal.querySelectorAll(".settings-nav-item").forEach(button => {
+    button.addEventListener("click", () => {
+      const tab = button.dataset.settingsTab;
+      modal.querySelectorAll(".settings-nav-item").forEach(item => {
+        const active = item === button;
+        item.classList.toggle("active", active);
+        item.setAttribute("aria-selected", String(active));
+      });
+      modal.querySelectorAll(".settings-tab-panel").forEach(panel => {
+        const active = panel.dataset.settingsPanel === tab;
+        panel.classList.toggle("active", active);
+        panel.hidden = !active;
+      });
+      if (title) title.textContent = labels[tab] || "Settings";
+    });
+  });
+
+  modal.querySelectorAll(".theme-option").forEach(button => {
+    button.addEventListener("click", () => {
+      setTheme(button.dataset.themeId);
+      renderThemePicker();
+      setupSettingsEvents();
+    });
+  });
+
+  modal.querySelector("#settings-test-sound")?.addEventListener("click", async () => {
+    await unlockAudio();
+    playSound("messageReceived");
+  });
+  modal.querySelector("#settings-reset")?.addEventListener("click", () => {
+    resetSoundSettings();
+    openSettings();
+    document.querySelector('#settings-modal [data-settings-tab="sounds"]')?.click();
+  });
+  modal.querySelector("#settings-hard-refresh")?.addEventListener("click", hardRefreshApp);
+  modal.querySelector("#settings-hard-refresh-app")?.addEventListener("click", hardRefreshApp);
+
+  modal.querySelector("#sound-volume")?.addEventListener("input", event => {
+    updateSoundSettings({ volume: Number(event.target.value) / 100 });
+  });
+  modal.querySelector("#sound-type")?.addEventListener("change", async event => {
+    updateSoundSettings({ soundType: event.target.value });
+    await unlockAudio();
+    playSound("messageReceived");
+  });
+
+  [["sound-enabled","enabled"],["sound-messageSent","messageSent"],["sound-messageReceived","messageReceived"],["sound-incomingCall","incomingCall"],["sound-callConnected","callConnected"]].forEach(([id,key]) => {
+    modal.querySelector("#" + id)?.addEventListener("click", event => {
+      const next = !getSoundSettings()[key];
+      updateSoundSettings({ [key]: next });
+      event.currentTarget.classList.toggle("active", next);
+      event.currentTarget.setAttribute("aria-checked", String(next));
+      if (next && key !== "enabled") playSound(key);
+    });
+  });
+
+  modal.addEventListener("click", event => {
+    if (event.target === modal) closeSettings();
+  });
+}
+
 async function hardRefreshApp() {
   const button = document.getElementById("settings-hard-refresh");
 
