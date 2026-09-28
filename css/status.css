@@ -308,3 +308,63 @@
   .status-composer { align-items: end; padding: 0; }
   .status-composer-card { border-radius: 20px 20px 0 0; }
 }
+
+
+/* Premium status polish */
+.status-section {
+  margin: 4px 7px 0;
+  padding: 11px 9px 8px;
+  border: 1px solid #edf1f2;
+  border-radius: 14px;
+  background: linear-gradient(145deg,#fbfdfd,#f6f9fa);
+  box-shadow: 0 2px 10px rgba(24,39,48,.04);
+}
+.status-heading {
+  padding: 2px 5px 8px;
+  color:#71828a;
+  font-size:11px;
+  letter-spacing:.08em;
+}
+.status-add {
+  width:31px;height:31px;
+  border:1px solid #d7e8e3;
+  background:#e8f6f2;
+  color:var(--primary);
+}
+.status-item {
+  padding:8px 6px;
+  border-radius:11px;
+}
+.status-item:hover { background:#edf7f4; }
+.status-avatar {
+  width:47px;height:47px;flex-basis:47px;
+  background:linear-gradient(145deg,#18a986,#087f66);
+  box-shadow:0 0 0 3px #fff,0 0 0 5px rgba(18,168,132,.18);
+}
+.status-ring {
+  border:3px solid #12a884;
+  box-shadow:0 0 0 3px #fff,0 0 0 5px rgba(18,168,132,.16);
+}
+.status-count {
+  background:#172126;
+  box-shadow:0 0 0 2px #fff;
+}
+.status-copy strong { font-weight:650; }
+.status-copy span { color:#819099; }
+
+.status-viewer {
+  background:
+    radial-gradient(circle at 50% 35%,rgba(18,168,132,.14),transparent 35%),
+    #071014;
+}
+.status-composer-card {
+  border:1px solid rgba(255,255,255,.55);
+  border-radius:22px;
+  box-shadow:0 30px 90px rgba(0,0,0,.32);
+}
+.status-composer textarea {
+  border-color:#e1e7e9;
+  border-radius:14px;
+}
+.status-primary { border-radius:11px; box-shadow:0 5px 14px rgba(18,168,132,.20); }
+.status-secondary { border-radius:11px; }
