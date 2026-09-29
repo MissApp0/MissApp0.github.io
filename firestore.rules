@@ -134,7 +134,10 @@ service cloud.firestore {
           && request.resource.data.text.size() <= 4000;
 
         allow delete: if conversationParticipant(conversationId)
-          && resource.data.senderId == request.auth.uid;
+          && (
+            resource.data.senderId == request.auth.uid
+            || resource.data.messageType == "call"
+          );
       }
 
       match /typing/{uid} {
@@ -170,7 +173,9 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               "offer",
               "status",
-              "endedAt"
+              "endedAt",
+              "messageId",
+              "conversationId"
             ])
           )
           ||
@@ -179,7 +184,9 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               "answer",
               "status",
-              "endedAt"
+              "endedAt",
+              "messageId",
+              "conversationId"
             ])
           )
         );
