@@ -118,11 +118,23 @@ async function createCallerPeer(uid) {
   active.unsubscribers.push(answerUnsub, candidateUnsub);
 }
 
+async function waitForGroupOffer(callId, uid, attempts = 12, delayMs = 500) {
+  const offerRef = doc(db, "groupCalls", callId, "offers", uid);
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const snapshot = await getDoc(offerRef);
+    if (snapshot.exists()) return snapshot;
+    if (attempt < attempts - 1) {
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+  return null;
+}
+
 async function answerGroupCall(call) {
   if (active || !auth.currentUser) return;
   const uid = auth.currentUser.uid;
-  const offerSnapshot = await getDoc(doc(db, "groupCalls", call.id, "offers", uid));
-  if (!offerSnapshot.exists()) throw new Error("The group call offer is no longer available.");
+  const offerSnapshot = await waitForGroupOffer(call.id, uid);
+  if (!offerSnapshot) throw new Error("The group call offer is not available yet. Please try accepting again.");
 
   const stream = await media(call.type === "video");
   const peer = new RTCPeerConnection(rtcConfig);
