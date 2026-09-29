@@ -49,7 +49,7 @@ export async function searchUsers(
       where(
         "key",
         "<=",
-        cleanTerm + "\uf8ff"
+        cleanTerm + ""
       ),
 
       orderBy(
@@ -65,10 +65,14 @@ export async function searchUsers(
 
 
   return snapshot.docs.map(
-    item => ({
-      id: item.id,
-      ...item.data()
-    })
+    item => {
+      const data = item.data() || {};
+      return {
+        id: item.id,
+        ...data,
+        uid: data.uid || item.id
+      };
+    }
   );
 
 }
