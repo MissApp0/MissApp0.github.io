@@ -119,7 +119,7 @@ service cloud.firestore {
           && request.auth.uid == uid;
       }
 
-      match /candidates/{routeId}/{candidateId} {
+      match /candidates/{routeId}/items/{candidateId} {
         allow read: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/groupCalls/$(callId)).data.participants;
         allow create: if isGroupCallParticipant(callId);
       }
