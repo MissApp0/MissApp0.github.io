@@ -118,6 +118,54 @@ export function listenConversations(render) {
       created: boolean
     }
 */
+export async function createGroupConversation(name, memberIds) {
+  const currentUserUid = state.user?.uid;
+  if (!currentUserUid) throw new Error("You must be logged in to create a group.");
+  const uniqueIds = [...new Set([currentUserUid, ...(memberIds || [])].filter(Boolean))];
+  if (uniqueIds.length < 3) throw new Error("Choose at least two other people.");
+  if (uniqueIds.length > 25) throw new Error("Groups are limited to 25 people.");
+
+  const snapshots = await Promise.all(uniqueIds.map(uid => getDoc(doc(db, "users", uid))));
+  const missing = snapshots.findIndex(snapshot => !snapshot.exists());
+  if (missing !== -1) throw new Error("One of the selected users could not be found.");
+
+  const participantData = {};
+  snapshots.forEach(snapshot => {
+    const data = snapshot.data() || {};
+    participantData[snapshot.id] = {
+      uid: snapshot.id,
+      username: data.username || "",
+      displayName: data.displayName || data.username || "",
+      email: data.email || ""
+    };
+  });
+
+  const conversationRef = doc(collection(db, "conversations"));
+  await setDoc(conversationRef, {
+    type: "group",
+    name: String(name || "New group").trim().slice(0, 60) || "New group",
+    participants: uniqueIds,
+    participantData,
+    ownerId: currentUserUid,
+    lastMessage: "",
+    lastMessageAt: serverTimestamp(),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+
+  return { id: conversationRef.id, created: true };
+}
+
+
+/*
+  Create or retrieve a 1-to-1 conversation.
+
+  Returns:
+    {
+      id: string,
+      created: boolean
+    }
+*/
 export async function createConversation(otherUserUid) {
   const currentUserUid = state.user?.uid;
 
