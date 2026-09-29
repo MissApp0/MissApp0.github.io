@@ -13,24 +13,37 @@ service cloud.firestore {
         && request.auth.uid in participants;
     }
 
+    function conversationParticipant(conversationId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/conversations/$(conversationId))
+        && request.auth.uid in get(
+          /databases/$(database)/documents/conversations/$(conversationId)
+        ).data.participants;
+    }
+
+    function groupCallParticipant(callId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/groupCalls/$(callId))
+        && request.auth.uid in get(
+          /databases/$(database)/documents/groupCalls/$(callId)
+        ).data.participants;
+    }
+
     function validParticipants(participants) {
       return participants is list
         && participants.size() >= 2
         && participants.size() <= 25;
     }
 
-    function isGroupCallParticipant(callId) {
-      return signedIn()
-        && request.auth.uid in get(
-          /databases/$(database)/documents/groupCalls/$(callId)
-        ).data.participants;
-    }
-
+    /*
+     * User profiles
+     *
+     * Profiles are intentionally readable by authenticated users because
+     * MissApp searches users by username/email and displays participant data.
+     */
     match /users/{uid} {
-      // User profiles are searchable by authenticated users.
       allow read: if signedIn();
 
-      // A user may create/update only their own profile.
       allow create: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.uid == uid;
@@ -43,14 +56,14 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-
+    /*
+     * Status / stories
+     */
     match /statuses/{statusId} {
-      // Authenticated users may see only live statuses.
       allow read: if signedIn()
         && resource.data.expiresAt is timestamp
         && resource.data.expiresAt > request.time;
 
-      // A user may publish only as themselves, for at most 24 hours.
       allow create: if signedIn()
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.text is string
@@ -78,95 +91,25 @@ service cloud.firestore {
           && request.auth.uid == viewerId
           && get(/databases/$(database)/documents/statuses/$(statusId)).data.expiresAt > request.time;
 
-        allow update, delete: if false;
+        allow update: if signedIn()
+          && request.auth.uid == viewerId
+          && get(/databases/$(database)/documents/statuses/$(statusId)).data.expiresAt > request.time;
+
+        allow delete: if signedIn()
+          && request.auth.uid == viewerId;
       }
     }
 
-    match /groupCalls/{callId} {
-      allow read: if signedIn() && request.auth.uid in resource.data.participants;
-      allow create: if signedIn()
-        && request.resource.data.caller == request.auth.uid
-        && request.resource.data.participants is list
-        && request.auth.uid in request.resource.data.participants
-        && request.resource.data.participants.size() >= 3
-        && request.resource.data.participants.size() <= 25
-        && request.resource.data.status == "ringing";
-      allow update: if signedIn()
-        && request.auth.uid in resource.data.participants
-        && request.resource.data.caller == resource.data.caller
-        && request.resource.data.participants == resource.data.participants;
-
-      match /offers/{uid} {
-        allow read: if isGroupCallParticipant(callId);
-        allow create, update: if isGroupCallParticipant(callId)
-          && request.auth.uid == get(
-            /databases/$(database)/documents/groupCalls/$(callId)
-          ).data.caller
-          && uid in get(
-            /databases/$(database)/documents/groupCalls/$(callId)
-          ).data.participants;
-      }
-
-      match /answers/{uid} {
-        allow read: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/groupCalls/$(callId)).data.participants;
-        allow create, update: if isGroupCallParticipant(callId)
-          && request.auth.uid == uid;
-      }
-
-      match /declinedBy/{uid} {
-        allow read: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/groupCalls/$(callId)).data.participants;
-        allow create: if isGroupCallParticipant(callId)
-          && request.auth.uid == uid;
-      }
-
-      match /candidates/{routeId}/items/{candidateId} {
-        allow read: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/groupCalls/$(callId)).data.participants;
-        allow create: if isGroupCallParticipant(callId);
-      }
-    }
-
-    match /calls/{callId} {
-      allow read: if signedIn()
-        && (resource.data.caller == request.auth.uid
-          || resource.data.callee == request.auth.uid);
-
-      allow create: if signedIn()
-        && request.resource.data.caller == request.auth.uid
-        && request.resource.data.callee is string
-        && request.resource.data.callee != request.auth.uid;
-
-      allow update: if signedIn()
-        && (resource.data.caller == request.auth.uid
-          || resource.data.callee == request.auth.uid)
-        && request.resource.data.caller == resource.data.caller
-        && request.resource.data.callee == resource.data.callee;
-
-      allow delete: if false;
-
-      match /callerCandidates/{candidateId} {
-        allow read: if signedIn()
-          && (get(/databases/$(database)/documents/calls/$(callId)).data.caller == request.auth.uid
-            || get(/databases/$(database)/documents/calls/$(callId)).data.callee == request.auth.uid);
-        allow create: if signedIn()
-          && get(/databases/$(database)/documents/calls/$(callId)).data.caller == request.auth.uid;
-        allow update, delete: if false;
-      }
-
-      match /calleeCandidates/{candidateId} {
-        allow read: if signedIn()
-          && (get(/databases/$(database)/documents/calls/$(callId)).data.caller == request.auth.uid
-            || get(/databases/$(database)/documents/calls/$(callId)).data.callee == request.auth.uid);
-        allow create: if signedIn()
-          && get(/databases/$(database)/documents/calls/$(callId)).data.callee == request.auth.uid;
-        allow update, delete: if false;
-      }
-    }
-
+    /*
+     * One-to-one and group conversations
+     *
+     * The conversation list uses:
+     *   participants array-contains currentUserUid
+     *
+     * Firestore can prove this query against the rule below.
+     */
     match /conversations/{conversationId} {
-      // Allow checking whether a new conversation ID already exists.
-      // If the document does not exist, there are no participant data to protect.
-      allow read: if !exists(/databases/$(database)/documents/conversations/$(conversationId))
-        || isParticipant(resource.data.participants);
+      allow read: if isParticipant(resource.data.participants);
 
       allow create: if signedIn()
         && validParticipants(request.resource.data.participants)
@@ -178,35 +121,145 @@ service cloud.firestore {
       allow delete: if false;
 
       match /messages/{messageId} {
+        allow read: if conversationParticipant(conversationId);
+
+        allow create: if conversationParticipant(conversationId)
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 4000;
+
+        allow update: if conversationParticipant(conversationId)
+          && resource.data.senderId == request.auth.uid
+          && request.resource.data.senderId == resource.data.senderId
+          && request.resource.data.text is string
+          && request.resource.data.text.size() <= 4000;
+
+        allow delete: if conversationParticipant(conversationId)
+          && resource.data.senderId == request.auth.uid;
+      }
+
+      match /typing/{uid} {
+        allow read: if conversationParticipant(conversationId);
+
+        allow create, update: if conversationParticipant(conversationId)
+          && request.auth.uid == uid;
+
+        allow delete: if signedIn()
+          && request.auth.uid == uid
+          && conversationParticipant(conversationId);
+      }
+    }
+
+    /*
+     * Normal one-to-one WebRTC calls
+     */
+    match /calls/{callId} {
+      allow read: if signedIn()
+        && (
+          resource.data.caller == request.auth.uid
+          || resource.data.callee == request.auth.uid
+        );
+
+      allow create: if signedIn()
+        && request.resource.data.caller == request.auth.uid
+        && request.resource.data.callee is string
+        && request.resource.data.callee != request.auth.uid;
+
+      allow update: if signedIn()
+        && (
+          resource.data.caller == request.auth.uid
+          || resource.data.callee == request.auth.uid
+        )
+        && request.resource.data.caller == resource.data.caller
+        && request.resource.data.callee == resource.data.callee;
+
+      allow delete: if false;
+
+      match /callerCandidates/{candidateId} {
         allow read: if signedIn()
           && (
-            resource.data.receiver == request.auth.uid
-            || isParticipant(
-              get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants
-            )
+            get(/databases/$(database)/documents/calls/$(callId)).data.caller == request.auth.uid
+            || get(/databases/$(database)/documents/calls/$(callId)).data.callee == request.auth.uid
           );
 
-        allow create: if isParticipant(
-          get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants
-        )
-        && request.resource.data.senderId == request.auth.uid
-        && request.resource.data.text is string
-        && request.resource.data.text.size() > 0
-        && request.resource.data.text.size() <= 4000;
+        allow create: if signedIn()
+          && get(/databases/$(database)/documents/calls/$(callId)).data.caller == request.auth.uid;
 
         allow update, delete: if false;
       }
 
-      match /typing/{uid} {
-        allow read: if isParticipant(
-          get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants
-        );
-
-        allow write: if signedIn()
-          && request.auth.uid == uid
-          && isParticipant(
-            get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants
+      match /calleeCandidates/{candidateId} {
+        allow read: if signedIn()
+          && (
+            get(/databases/$(database)/documents/calls/$(callId)).data.caller == request.auth.uid
+            || get(/databases/$(database)/documents/calls/$(callId)).data.callee == request.auth.uid
           );
+
+        allow create: if signedIn()
+          && get(/databases/$(database)/documents/calls/$(callId)).data.callee == request.auth.uid;
+
+        allow update, delete: if false;
+      }
+    }
+
+    /*
+     * Group WebRTC calls
+     *
+     * Layout used by the app:
+     * groupCalls/{callId}
+     * groupCalls/{callId}/offers/{uid}
+     * groupCalls/{callId}/answers/{uid}
+     * groupCalls/{callId}/declinedBy/{uid}
+     * groupCalls/{callId}/candidates/{routeId}/items/{candidateId}
+     */
+    match /groupCalls/{callId} {
+      allow read: if groupCallParticipant(callId);
+
+      allow create: if signedIn()
+        && request.resource.data.caller == request.auth.uid
+        && request.resource.data.participants is list
+        && request.auth.uid in request.resource.data.participants
+        && request.resource.data.participants.size() >= 3
+        && request.resource.data.participants.size() <= 25
+        && request.resource.data.status == "ringing";
+
+      allow update: if groupCallParticipant(callId)
+        && request.resource.data.caller == resource.data.caller
+        && request.resource.data.participants == resource.data.participants;
+
+      allow delete: if false;
+
+      match /offers/{uid} {
+        allow read: if groupCallParticipant(callId);
+
+        allow create, update: if groupCallParticipant(callId)
+          && request.auth.uid == get(
+            /databases/$(database)/documents/groupCalls/$(callId)
+          ).data.caller
+          && uid in get(
+            /databases/$(database)/documents/groupCalls/$(callId)
+          ).data.participants;
+      }
+
+      match /answers/{uid} {
+        allow read: if groupCallParticipant(callId);
+
+        allow create, update: if groupCallParticipant(callId)
+          && request.auth.uid == uid;
+      }
+
+      match /declinedBy/{uid} {
+        allow read: if groupCallParticipant(callId);
+
+        allow create: if groupCallParticipant(callId)
+          && request.auth.uid == uid;
+      }
+
+      match /candidates/{routeId}/items/{candidateId} {
+        allow read: if groupCallParticipant(callId);
+
+        allow create: if groupCallParticipant(callId);
       }
     }
   }
