@@ -55,6 +55,8 @@ let networkOnline = navigator.onLine;
 let lastRealtimeActivity = 0;
 let healthTimer = null;
 let realtimeHealthy = true;
+let typingUnsubscribe = null;
+let typingStopTimer = null;
 
 document.addEventListener("DOMContentLoaded", init, { once: true });
 
@@ -1304,6 +1306,7 @@ function openConversation(item) {
   enableComposer();
   renderConversationActive();
   listenToMessages(conversationId);
+  startTypingListener(conversationId);
 
   document.body.classList.add("chat-open");
 
@@ -1608,6 +1611,31 @@ async function handleSendMessage(event) {
       );
     }
   }
+}
+
+async function setTypingState(isTyping) {
+  if (!state.user || !state.currentConversation) return;
+  clearTimeout(typingStopTimer);
+  try {
+    await setDoc(doc(db, "conversations", state.currentConversation.id, "typing", state.user.uid), {
+      uid: state.user.uid,
+      isTyping,
+      displayName: state.me?.displayName || state.me?.username || "Someone",
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  } catch (error) { console.debug("Typing state update failed:", error); }
+  if (isTyping) typingStopTimer = setTimeout(() => setTypingState(false), 1800);
+}
+
+function startTypingListener(conversationId) {
+  typingUnsubscribe?.();
+  typingUnsubscribe = onSnapshot(collection(db, "conversations", conversationId, "typing"), snapshot => {
+    const other = snapshot.docs.map(d => d.data()).find(d => d.uid !== state.user?.uid && d.isTyping);
+    const el = document.getElementById("typing-indicator");
+    if (!el) return;
+    el.textContent = other ? (other.displayName || "Someone") + " is typing…" : "";
+    el.classList.toggle("visible", Boolean(other));
+  }, error => console.debug("Typing listener error:", error));
 }
 
 function handleMessageInput() {
