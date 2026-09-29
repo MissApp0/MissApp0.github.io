@@ -8,7 +8,22 @@ service cloud.firestore {
     }
 
     function isParticipant(participants) {
-      return signedIn() && request.auth.uid in participants;
+      return signedIn()
+        && participants is list
+        && request.auth.uid in participants;
+    }
+
+    function validParticipants(participants) {
+      return participants is list
+        && participants.size() >= 2
+        && participants.size() <= 25;
+    }
+
+    function isGroupCallParticipant(callId) {
+      return signedIn()
+        && request.auth.uid in get(
+          /databases/$(database)/documents/groupCalls/$(callId)
+        ).data.participants;
     }
 
     match /users/{uid} {
@@ -71,39 +86,42 @@ service cloud.firestore {
       allow read: if signedIn() && request.auth.uid in resource.data.participants;
       allow create: if signedIn()
         && request.resource.data.caller == request.auth.uid
+        && request.resource.data.participants is list
         && request.auth.uid in request.resource.data.participants
         && request.resource.data.participants.size() >= 3
-        && request.resource.data.participants.size() <= 25;
+        && request.resource.data.participants.size() <= 25
+        && request.resource.data.status == "ringing";
       allow update: if signedIn()
         && request.auth.uid in resource.data.participants
         && request.resource.data.caller == resource.data.caller
         && request.resource.data.participants == resource.data.participants;
 
       match /offers/{uid} {
-        allow read: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/groupCalls/$(callId)).data.participants;
-        allow create, update: if signedIn()
-          && request.auth.uid == uid
-          && request.auth.uid == get(/databases/$(database)/documents/groupCalls/$(callId)).data.caller;
+        allow read: if isGroupCallParticipant(callId);
+        allow create, update: if isGroupCallParticipant(callId)
+          && request.auth.uid == get(
+            /databases/$(database)/documents/groupCalls/$(callId)
+          ).data.caller
+          && uid in get(
+            /databases/$(database)/documents/groupCalls/$(callId)
+          ).data.participants;
       }
 
       match /answers/{uid} {
         allow read: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/groupCalls/$(callId)).data.participants;
-        allow create, update: if signedIn()
-          && request.auth.uid == uid
-          && request.auth.uid in get(/databases/$(database)/documents/groupCalls/$(callId)).data.participants;
+        allow create, update: if isGroupCallParticipant(callId)
+          && request.auth.uid == uid;
       }
 
       match /declinedBy/{uid} {
         allow read: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/groupCalls/$(callId)).data.participants;
-        allow create: if signedIn()
-          && request.auth.uid == uid
-          && request.auth.uid in get(/databases/$(database)/documents/groupCalls/$(callId)).data.participants;
+        allow create: if isGroupCallParticipant(callId)
+          && request.auth.uid == uid;
       }
 
       match /candidates/{routeId}/{candidateId} {
         allow read: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/groupCalls/$(callId)).data.participants;
-        allow create: if signedIn()
-          && request.auth.uid in get(/databases/$(database)/documents/groupCalls/$(callId)).data.participants;
+        allow create: if isGroupCallParticipant(callId);
       }
     }
 
@@ -151,8 +169,7 @@ service cloud.firestore {
         || isParticipant(resource.data.participants);
 
       allow create: if signedIn()
-        && request.resource.data.participants is list
-        && request.resource.data.participants.size() >= 2 && request.resource.data.participants.size() <= 25
+        && validParticipants(request.resource.data.participants)
         && request.auth.uid in request.resource.data.participants;
 
       allow update: if isParticipant(resource.data.participants)
