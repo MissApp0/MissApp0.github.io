@@ -4,7 +4,6 @@ import { playSound } from "./sounds.js";
 import {
   addDoc,
   collection,
-  deleteDoc,
   doc,
   getDoc,
   onSnapshot,
@@ -54,6 +53,8 @@ const rtcConfig = {
 
 const CALL_TIMEOUT_MS = 30000;
 const RECONNECT_GRACE_MS = 12000;
+const OFFER_WAIT_ATTEMPTS = 20;
+const OFFER_WAIT_DELAY_MS = 500;
 
 let activeCall = null;
 let incomingUnsubscribe = null;
@@ -354,15 +355,35 @@ async function answerCall(call) {
   attachPeerMonitoring(peer, call);
 
   const callRef = doc(db, "calls", call.id);
-  const snapshot = await getDoc(callRef);
+  let snapshot = null;
 
-  if (!snapshot.exists()) {
-    stream.getTracks().forEach(track => track.stop());
-    peer.close();
-    throw new Error("This call is no longer available.");
+  for (let attempt = 0; attempt < OFFER_WAIT_ATTEMPTS; attempt += 1) {
+    snapshot = await getDoc(callRef);
+
+    if (!snapshot.exists()) {
+      stream.getTracks().forEach(track => track.stop());
+      peer.close();
+      throw new Error("This call is no longer available.");
+    }
+
+    const data = snapshot.data();
+
+    if (data.offer?.sdp && data.offer?.type) {
+      break;
+    }
+
+    if (attempt < OFFER_WAIT_ATTEMPTS - 1) {
+      await new Promise(resolve => setTimeout(resolve, OFFER_WAIT_DELAY_MS));
+    }
   }
 
-  const data = snapshot.data();
+  const data = snapshot?.data();
+
+  if (!data?.offer?.sdp || !data?.offer?.type) {
+    stream.getTracks().forEach(track => track.stop());
+    peer.close();
+    throw new Error("The call offer was not ready. Please try accepting again.");
+  }
 
   await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
   await flushRemoteCandidates(peer);
