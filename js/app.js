@@ -15,9 +15,11 @@ import {
   doc,
   getDoc,
   setDoc,
+  updateDoc,
   serverTimestamp,
   collection,
   addDoc,
+  deleteDoc,
   query,
   orderBy,
   limit,
@@ -303,6 +305,8 @@ function createAppUI() {
         </div>
       </div>
     </div>
+
+    <div id="typing-indicator" class="typing-indicator" aria-live="polite"></div>
 
     <div class="chat-composer">
       <form id="composer-form" class="composer-form">
@@ -1322,15 +1326,15 @@ async function beginCall(video) {
 
   try {
     if (conversation.isGroup) {
-      await startGroupCall({ participantIds: conversation.participants.filter(uid => uid !== state.user.uid), participantData: conversation.participantData, groupName: conversation.name, video });
-      await addCallMessage(conversation.id, video ? "video" : "voice", true);
+      const call = await startGroupCall({ participantIds: conversation.participants.filter(uid => uid !== state.user.uid), participantData: conversation.participantData, groupName: conversation.name, video });
+      await addCallMessage(conversation.id, video ? "video" : "voice", true, call?.id);
       return;
     }
 
     const other = conversation.otherUser;
     if (!other?.uid) throw new Error("The other user could not be identified.");
-    await startCall({ calleeId: other.uid, calleeName: other.username || other.displayName || other.email || "User", video });
-    await addCallMessage(conversation.id, video ? "video" : "voice", false);
+    const call = await startCall({ calleeId: other.uid, calleeName: other.username || other.displayName || other.email || "User", video });
+    await addCallMessage(conversation.id, video ? "video" : "voice", false, call?.id);
   } catch (error) {
     console.error("Start call error:", error);
     showToast(error?.message || "Could not start the call.", "error");
@@ -1622,8 +1626,8 @@ async function handleSendMessage(event) {
 }
 
 
-async function addCallMessage(conversationId, callType, isGroup) {
-  await addDoc(collection(db, "conversations", conversationId, "messages"), {
+async function addCallMessage(conversationId, callType, isGroup, callId) {
+  const messageRef = await addDoc(collection(db, "conversations", conversationId, "messages"), {
     senderId: state.user.uid,
     sender: state.user.uid,
     receiver: isGroup ? "" : (state.currentConversation?.otherUserId || ""),
@@ -1634,6 +1638,16 @@ async function addCallMessage(conversationId, callType, isGroup) {
     groupCall: isGroup,
     createdAt: serverTimestamp()
   });
+
+  if (callId) {
+    try {
+      await updateDoc(doc(db, isGroup ? "groupCalls" : "calls", callId), { messageId: messageRef.id, conversationId });
+    } catch (error) {
+      console.debug("Could not link call history message:", error);
+    }
+  }
+
+  return messageRef.id;
 }
 
 async function rejoinCallFromMessage(message) {
