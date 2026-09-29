@@ -254,7 +254,11 @@ function showIncoming(call) {
 }
 
 async function declineGroup(callId) {
-  try { await updateDoc(doc(db, "groupCalls", callId), { status: "declined", endedAt: serverTimestamp() }); } catch {}
+  try {
+    await setDoc(doc(db, "groupCalls", callId, "declinedBy", auth.currentUser.uid), {
+      at: serverTimestamp()
+    });
+  } catch {}
   hideIncoming();
 }
 
