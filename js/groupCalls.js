@@ -48,9 +48,13 @@ export async function startGroupCall({ participantIds, participantData = {}, gro
   if (!window.isSecureContext) throw new Error("Group calls require HTTPS.");
   if (active) throw new Error("A call is already active.");
 
-  const stream = await media(video);
   const caller = auth.currentUser.uid;
-  const participants = [caller, ...new Set(participantIds.filter(Boolean))];
+  const participants = [caller, ...new Set(participantIds.filter(uid => uid && uid !== caller))];
+
+  if (participants.length < 3) throw new Error("Group calls need at least three participants.");
+  if (participants.length > 25) throw new Error("Groups are limited to 25 participants.");
+
+  const stream = await media(video);
   const callRef = doc(collection(db, "groupCalls"));
   const call = {
     id: callRef.id,
@@ -64,11 +68,16 @@ export async function startGroupCall({ participantIds, participantData = {}, gro
     createdAt: serverTimestamp()
   };
 
-  await setDoc(callRef, call);
-  active = { ...call, stream, peers: new Map(), remoteStreams: new Map(), unsubscribers: [], role: "caller" };
-  showScreen(active);
+  try {
+    await setDoc(callRef, call);
+    active = { ...call, stream, peers: new Map(), remoteStreams: new Map(), unsubscribers: [], role: "caller" };
+    showScreen(active);
 
-  for (const uid of participants.slice(1)) await createCallerPeer(uid);
+    for (const uid of participants.slice(1)) await createCallerPeer(uid);
+  } catch (error) {
+    stream.getTracks().forEach(track => track.stop());
+    throw error;
+  }
 }
 
 async function createCallerPeer(uid) {
