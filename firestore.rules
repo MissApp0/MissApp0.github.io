@@ -162,18 +162,27 @@ service cloud.firestore {
         && request.resource.data.callee != request.auth.uid;
 
       allow update: if signedIn()
-        && (
-          resource.data.caller == request.auth.uid
-          || resource.data.callee == request.auth.uid
-        )
         && request.resource.data.caller == resource.data.caller
         && request.resource.data.callee == resource.data.callee
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          "offer",
-          "answer",
-          "status",
-          "endedAt"
-        ]);
+        && (
+          (
+            request.auth.uid == resource.data.caller
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              "offer",
+              "status",
+              "endedAt"
+            ])
+          )
+          ||
+          (
+            request.auth.uid == resource.data.callee
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              "answer",
+              "status",
+              "endedAt"
+            ])
+          )
+        );
 
       allow delete: if false;
 
