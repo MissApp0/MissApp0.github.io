@@ -12,10 +12,26 @@ import { playSound } from "./sounds.js";
 let incomingUnsubscribe = null;
 let active = null;
 
+const stunServers = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+  { urls: "stun:stun.cloudflare.com:3478" }
+];
+
+const turnServers = Array.isArray(turnConfig?.urls) && turnConfig.urls.length
+  ? [{
+      urls: turnConfig.urls,
+      username: turnConfig.username || undefined,
+      credential: turnConfig.credential || undefined
+    }]
+  : [];
+
 const rtcConfig = {
-  iceServers: Array.isArray(turnConfig?.urls) && turnConfig.urls.length
-    ? [{ urls: turnConfig.urls, username: turnConfig.username || undefined, credential: turnConfig.credential || undefined }]
-    : []
+  iceServers: [...stunServers, ...turnServers],
+  iceCandidatePoolSize: 10,
+  bundlePolicy: "max-bundle",
+  rtcpMuxPolicy: "require",
+  iceTransportPolicy: "all"
 };
 
 export function initGroupCalls() {
