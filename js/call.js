@@ -670,7 +670,8 @@ window.MissAppCalls = {
   endActiveCall,
   getCallCapabilities
 };
-\nif (window.missappDesktop?.onCallAction) {
+
+if (window.missappDesktop?.onCallAction) {
   window.missappDesktop.onCallAction(async action => {
     if (action?.type === "accept" && action.callId) {
       const snapshot = await getDoc(doc(db, "calls", action.callId));
