@@ -505,12 +505,16 @@ export async function endActiveCall(notify = true) {
     }
   }
 
-  if (call.messageId && call.conversationId) {
-    try {
-      await deleteDoc(doc(db, "conversations", call.conversationId, "messages", call.messageId));
-    } catch (error) {
-      console.debug("Call history cleanup failed:", error);
+  try {
+    const callSnapshot = await getDoc(doc(db, "calls", call.id));
+    const callData = callSnapshot.exists() ? callSnapshot.data() : {};
+    const messageId = call.messageId || callData.messageId;
+    const conversationId = call.conversationId || callData.conversationId;
+    if (messageId && conversationId) {
+      await deleteDoc(doc(db, "conversations", conversationId, "messages", messageId));
     }
+  } catch (error) {
+    console.debug("Call history cleanup failed:", error);
   }
 
   call.unsubscribers?.forEach(unsub => unsub());
