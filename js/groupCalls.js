@@ -143,7 +143,7 @@ async function createCallerPeer(uid) {
   active.unsubscribers.push(answerUnsub, candidateUnsub);
 }
 
-async function waitForGroupOffer(callId, uid, attempts = 12, delayMs = 500) {
+async function waitForGroupOffer(callId, uid, attempts = 20, delayMs = 500) {
   const offerRef = doc(db, "groupCalls", callId, "offers", uid);
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const snapshot = await getDoc(offerRef);
