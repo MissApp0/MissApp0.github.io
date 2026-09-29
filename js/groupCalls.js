@@ -3,7 +3,7 @@
    Firebase/WebRTC architecture dependency-free and practical for small groups. */
 import { auth, db } from "./firebase.js";
 import {
-  collection, doc, getDoc, getDocs, setDoc, updateDoc, addDoc,
+  collection, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, deleteDoc,
   serverTimestamp, query, where, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { turnConfig } from "./config.js";
@@ -120,8 +120,14 @@ export async function startGroupCall({ participantIds, participantData = {}, gro
     });
 
     active = { ...call, stream, peers: new Map(), remoteStreams: new Map(), unsubscribers: [], role: "caller" };
+    const stateUnsub = onSnapshot(doc(db, "groupCalls", call.id), snapshot => {
+      const data = snapshot.data();
+      if (!data || ["ended", "declined"].includes(data.status)) endGroupCall(false);
+    });
+    active.unsubscribers.push(stateUnsub);
     showScreen(active);
     await setupGroupMesh();
+    return active;
   } catch (error) {
     stream.getTracks().forEach(track => track.stop());
     throw error;
@@ -461,6 +467,13 @@ export async function endGroupCall(notify = true) {
   active = null;
   if (notify) {
     try { await updateDoc(doc(db, "groupCalls", call.id), { status: "ended", endedAt: serverTimestamp() }); } catch {}
+  }
+  if (call.messageId && call.conversationId) {
+    try {
+      await deleteDoc(doc(db, "conversations", call.conversationId, "messages", call.messageId));
+    } catch (error) {
+      console.debug("Group call history cleanup failed:", error);
+    }
   }
   call.unsubscribers?.forEach(unsubscribe => unsubscribe());
   call.peers?.forEach(peer => peer.close());
