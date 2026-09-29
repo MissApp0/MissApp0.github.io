@@ -1478,27 +1478,39 @@ function renderMessages(messages) {
           message.createdAt
         );
 
+      if (message.messageType === "call") {
+        return `
+          <div class="message-row ${mine ? "mine" : "theirs"}">
+            <div class="message call-message">
+              <div class="call-message-icon">${message.callType === "video" ? "▣" : "☎"}</div>
+              <div class="call-message-copy">
+                <strong>${message.callType === "video" ? "Video call" : "Voice call"}</strong>
+                <span>${mine ? "You started a call" : escapeHTML(message.senderName || "Call")}</span>
+              </div>
+              <button class="call-rejoin-button" type="button" data-rejoin-message-id="${escapeHTML(message.id)}">Rejoin</button>
+              ${time ? `<div class="message-time">${escapeHTML(time)}</div>` : ""}
+            </div>
+          </div>
+        `;
+      }
+
       return `
         <div class="message-row ${mine ? "mine" : "theirs"}">
           <div class="message">
-            <div class="message-text">
-              ${escapeHTML(message.text || "")}
-            </div>
-
-            ${
-              time
-                ? `
-                  <div class="message-time">
-                    ${escapeHTML(time)}
-                  </div>
-                `
-                : ""
-            }
+            <div class="message-text">${escapeHTML(message.text || "")}</div>
+            ${time ? `<div class="message-time">${escapeHTML(time)}</div>` : ""}
           </div>
         </div>
       `;
     })
     .join("");
+
+  container.querySelectorAll("[data-rejoin-message-id]").forEach(button => {
+    button.addEventListener("click", () => {
+      const message = messages.find(item => item.id === button.dataset.rejoinMessageId);
+      if (message) rejoinCallFromMessage(message);
+    });
+  });
 
   scrollMessagesToBottom();
 }
@@ -1613,6 +1625,38 @@ async function handleSendMessage(event) {
         "disabled"
       );
     }
+  }
+}
+
+
+async function addCallMessage(conversationId, callType, isGroup) {
+  await addDoc(collection(db, "conversations", conversationId, "messages"), {
+    senderId: state.user.uid,
+    sender: state.user.uid,
+    receiver: isGroup ? "" : (state.currentConversation?.otherUserId || ""),
+    senderName: state.me?.displayName || state.me?.username || state.user.email || "User",
+    text: callType === "video" ? "Video call" : "Voice call",
+    messageType: "call",
+    callType,
+    groupCall: isGroup,
+    createdAt: serverTimestamp()
+  });
+}
+
+async function rejoinCallFromMessage(message) {
+  const conversation = state.currentConversation;
+  if (!conversation) return;
+  try {
+    if (conversation.isGroup) {
+      await startGroupCall({ participantIds: conversation.participants.filter(uid => uid !== state.user.uid), participantData: conversation.participantData, groupName: conversation.name, video: message.callType === "video" });
+    } else {
+      const other = conversation.otherUser;
+      if (!other?.uid) throw new Error("The other user could not be identified.");
+      await startCall({ calleeId: other.uid, calleeName: other.username || other.displayName || other.email || "User", video: message.callType === "video" });
+    }
+  } catch (error) {
+    console.error("Rejoin call error:", error);
+    showToast(error?.message || "Could not rejoin the call.", "error");
   }
 }
 
