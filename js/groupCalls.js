@@ -136,10 +136,14 @@ async function setupGroupMesh() {
     if (!remoteUid || remoteUid === uid) continue;
 
     // One deterministic initiator per pair prevents offer collisions.
-    if (uid < remoteUid) {
-      await createMeshOffer(remoteUid);
-    } else {
-      await listenForMeshOffer(remoteUid);
+    try {
+      if (uid < remoteUid) {
+        await createMeshOffer(remoteUid);
+      } else {
+        await listenForMeshOffer(remoteUid);
+      }
+    } catch (error) {
+      console.error("Group call peer setup failed:", remoteUid, error);
     }
   }
 }
@@ -187,7 +191,15 @@ async function createMeshOffer(remoteUid) {
     sdp: offer.sdp
   };
 
-  await setDoc(doc(db, "groupCalls", callId, "offers", pairId(uid, remoteUid)), signal);
+  try {
+    await setDoc(doc(db, "groupCalls", callId, "offers", pairId(uid, remoteUid)), signal);
+  } catch (error) {
+    peer.close();
+    active.peers.delete(remoteUid);
+    active.remoteStreams.delete(remoteUid);
+    console.error("Group call offer write failed:", remoteUid, error);
+    throw error;
+  }
 
   const answerUnsub = onSnapshot(
     doc(db, "groupCalls", callId, "answers", pairId(uid, remoteUid)),
@@ -318,7 +330,11 @@ async function answerGroupCall(call) {
   hideIncoming();
   showScreen(active);
 
-  await setupGroupMesh();
+  try {
+    await setupGroupMesh();
+  } catch (error) {
+    console.error("Group call mesh setup error:", error);
+  }
 }
 async function flushCandidates(callId, routeId, peer) {
   const snapshot = await getDocs(collection(db, "groupCalls", callId, "candidates", routeId, "items"));
