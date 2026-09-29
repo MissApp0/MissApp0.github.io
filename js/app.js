@@ -1078,12 +1078,19 @@ function notifyForIncomingMessage(conversationId, message) {
     Notification.permission === "granted"
   ) {
     try {
-      new Notification(senderName, {
-        body: preview || "Sent you a message",
-        tag: conversationId || message.id
-      });
+      if (window.missappDesktop?.notify) {
+        window.missappDesktop.notify({
+          title: senderName,
+          body: preview || "Sent you a message"
+        });
+      } else {
+        new Notification(senderName, {
+          body: preview || "Sent you a message",
+          tag: conversationId || message.id
+        });
+      }
     } catch (error) {
-      console.warn("Browser notification failed:", error);
+      console.warn("Desktop notification failed:", error);
     }
   }
 }
