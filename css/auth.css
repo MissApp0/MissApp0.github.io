@@ -492,3 +492,11 @@
   .auth-shell { animation: none; }
   .auth-submit > span:last-child { transition: none; }
 }
+
+/* Auth motion */
+#auth { animation:auth-surface-in var(--motion-slow) var(--ease-emphasized); }
+.auth-card { animation:card-in var(--motion-slow) var(--ease-emphasized); }
+.auth-form:not(.hidden) { animation:auth-form-in var(--motion-base) var(--ease-emphasized); }
+.auth-form .input:focus { transform:translateY(-1px); }
+@keyframes auth-surface-in { from { opacity:0 } to { opacity:1 } }
+@keyframes auth-form-in { from { opacity:0; transform:translateY(5px) } to { opacity:1; transform:none } }
