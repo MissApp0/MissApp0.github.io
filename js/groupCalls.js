@@ -169,6 +169,22 @@ async function createMeshOffer(remoteUid) {
     attachRemote(remoteUid, remoteStream, active.participantData?.[remoteUid]);
   };
 
+  peer.onconnectionstatechange = () => {
+    console.info("Group peer connection:", remoteUid, peer.connectionState);
+    const status = document.getElementById("group-call-status");
+    if (status) status.textContent =
+      peer.connectionState === "connected" ? "Connected" :
+      peer.connectionState === "connecting" ? "Connecting…" :
+      peer.connectionState === "failed" ? "Connection failed" :
+      peer.connectionState === "disconnected" ? "Disconnected" : "Calling…";
+  };
+  peer.oniceconnectionstatechange = () => {
+    console.info("Group ICE:", remoteUid, peer.iceConnectionState);
+  };
+  peer.onicegatheringstatechange = () => {
+    console.info("Group ICE gathering:", remoteUid, peer.iceGatheringState);
+  };
+
   peer.onicecandidate = async event => {
     if (!event.candidate) return;
     try {
@@ -247,6 +263,19 @@ async function listenForMeshOffer(remoteUid) {
     peer.ontrack = event => {
       event.streams[0]?.getTracks().forEach(track => remoteStream.addTrack(track));
       attachRemote(remoteUid, remoteStream, active.participantData?.[remoteUid]);
+    };
+
+    peer.onconnectionstatechange = () => {
+      console.info("Group peer connection:", remoteUid, peer.connectionState);
+      const status = document.getElementById("group-call-status");
+      if (status) status.textContent =
+        peer.connectionState === "connected" ? "Connected" :
+        peer.connectionState === "connecting" ? "Connecting…" :
+        peer.connectionState === "failed" ? "Connection failed" :
+        peer.connectionState === "disconnected" ? "Disconnected" : "Calling…";
+    };
+    peer.oniceconnectionstatechange = () => {
+      console.info("Group ICE:", remoteUid, peer.iceConnectionState);
     };
 
     peer.onicecandidate = async event => {
