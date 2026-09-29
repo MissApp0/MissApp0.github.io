@@ -36,18 +36,44 @@ const rtcConfig = {
 
 export function initGroupCalls() {
   if (!auth.currentUser) return;
+
   incomingUnsubscribe?.();
-  const q = query(collection(db, "groupCalls"), where("participants", "array-contains", auth.currentUser.uid));
-  incomingUnsubscribe = onSnapshot(q, snapshot => {
-    snapshot.docChanges().forEach(change => {
-      if (!["added", "modified"].includes(change.type)) return;
-      const call = { id: change.doc.id, ...change.doc.data() };
-      if (call.caller !== auth.currentUser.uid && call.status === "ringing" && !active) {
-        playSound("incomingCall");
-        showIncoming(call);
-      }
-    });
-  }, error => console.error("Group call listener error:", error));
+  incomingUnsubscribe = null;
+
+  const uid = auth.currentUser.uid;
+  const callsRef = collection(db, "groupCalls");
+  const q = query(callsRef, where("participants", "array-contains", uid));
+
+  incomingUnsubscribe = onSnapshot(
+    q,
+    snapshot => {
+      snapshot.docChanges().forEach(change => {
+        if (!["added", "modified"].includes(change.type)) return;
+
+        const call = { id: change.doc.id, ...change.doc.data() };
+
+        if (
+          call.caller !== uid &&
+          call.status === "ringing" &&
+          Array.isArray(call.participants) &&
+          call.participants.includes(uid) &&
+          !active
+        ) {
+          playSound("incomingCall");
+          showIncoming(call);
+        }
+      });
+    },
+    error => {
+      console.error("Group call listener error:", error);
+      window.MissApp?.showToast?.(
+        "Group calls cannot receive invitations. Check Firestore permissions.",
+        "error"
+      );
+    }
+  );
+
+  return incomingUnsubscribe;
 }
 
 async function media(video) {
@@ -86,6 +112,13 @@ export async function startGroupCall({ participantIds, participantData = {}, gro
 
   try {
     await setDoc(callRef, call);
+
+    console.info("Group call invitation created:", {
+      callId: callRef.id,
+      participants,
+      caller
+    });
+
     active = { ...call, stream, peers: new Map(), remoteStreams: new Map(), unsubscribers: [], role: "caller" };
     showScreen(active);
 
