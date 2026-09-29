@@ -34,16 +34,12 @@ jobs:
       - name: Install Firebase CLI
         run: npm install --global firebase-tools@latest
 
-      - name: Authenticate Firebase CLI
+      - name: Deploy Firestore rules
         env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
-          test -n "$FIREBASE_SERVICE_ACCOUNT" || {
-            echo "FIREBASE_SERVICE_ACCOUNT GitHub secret is not configured."
+          test -n "$FIREBASE_TOKEN" || {
+            echo "FIREBASE_TOKEN GitHub secret is not configured."
             exit 1
           }
-          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-service-account.json"
-          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
-
-      - name: Deploy Firestore rules
-        run: firebase deploy --only firestore:rules --project missapp-c099e --non-interactive
+          firebase deploy --only firestore:rules --project missapp-c099e --token "$FIREBASE_TOKEN" --non-interactive
