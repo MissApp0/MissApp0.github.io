@@ -168,7 +168,6 @@ async function answerGroupCall(call) {
   );
   active.unsubscribers.push(stateUnsub, candidateUnsub);
 
-  await updateDoc(doc(db, "groupCalls", call.id), { status: "connected" });
   hideIncoming();
   showScreen(active);
 }
