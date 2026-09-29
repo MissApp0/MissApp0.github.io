@@ -35,14 +35,11 @@ import {
 } from "./chat/search.js";
 
 import {
-  createConversation
-} from "./chat/conversations.js";
-
-import {
   initCalls,
   startCall,
   endActiveCall
 } from "./call.js";
+import { initGroupCalls, startGroupCall } from "./groupCalls.js";
 
 let unsubscribeConversations = null;
 let unsubscribeMessages = null;
@@ -1295,8 +1292,12 @@ function openConversation(item) {
 
   state.currentConversation = {
     id: conversationId,
-    otherUserId: otherUser.uid || null,
-    otherUser
+    otherUserId: isGroup ? null : (otherUser.uid || null),
+    otherUser,
+    isGroup,
+    participants: data.participants || [],
+    participantData: data.participantData || {},
+    name: isGroup ? (data.name || "Group") : ""
   };
 
   updateChatHeader(otherUser, data);
@@ -1309,7 +1310,7 @@ function openConversation(item) {
   closeSidebar();
 }
 
-async async function beginCall(video) {
+async function beginCall(video) {
   const conversation = state.currentConversation;
   if (!conversation) {
     showToast("Open a conversation first.", "error");
