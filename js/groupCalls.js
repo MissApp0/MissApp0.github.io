@@ -86,7 +86,7 @@ async function createCallerPeer(uid) {
   };
   peer.onicecandidate = async event => {
     if (!event.candidate) return;
-    await addDoc(collection(db, "groupCalls", callId, "candidates", route(active.caller, uid)), event.candidate.toJSON());
+    await addDoc(collection(db, "groupCalls", callId, "candidates", route(active.caller, uid), "items"), event.candidate.toJSON());
   };
 
   const offer = await peer.createOffer();
@@ -107,7 +107,7 @@ async function createCallerPeer(uid) {
   });
 
   const candidateUnsub = onSnapshot(
-    collection(db, "groupCalls", callId, "candidates", route(uid, active.caller)),
+    collection(db, "groupCalls", callId, "candidates", route(uid, active.caller), "items"),
     snapshot => snapshot.docChanges().forEach(change => {
       if (change.type === "added") {
         peer.addIceCandidate(new RTCIceCandidate(change.doc.data())).catch(() => {});
@@ -147,7 +147,7 @@ async function answerGroupCall(call) {
   };
   peer.onicecandidate = async event => {
     if (!event.candidate) return;
-    await addDoc(collection(db, "groupCalls", call.id, "candidates", route(uid, call.caller)), event.candidate.toJSON());
+    await addDoc(collection(db, "groupCalls", call.id, "candidates", route(uid, call.caller), "items"), event.candidate.toJSON());
   };
 
   await peer.setRemoteDescription(new RTCSessionDescription(offerSnapshot.data()));
@@ -173,7 +173,7 @@ async function answerGroupCall(call) {
     if (!data || ["ended", "declined"].includes(data.status)) endGroupCall(false);
   });
   const candidateUnsub = onSnapshot(
-    collection(db, "groupCalls", call.id, "candidates", route(call.caller, uid)),
+    collection(db, "groupCalls", call.id, "candidates", route(call.caller, uid), "items"),
     snapshot => snapshot.docChanges().forEach(change => {
       if (change.type === "added") peer.addIceCandidate(new RTCIceCandidate(change.doc.data())).catch(() => {});
     })
@@ -185,7 +185,7 @@ async function answerGroupCall(call) {
 }
 
 async function flushCandidates(callId, routeId, peer) {
-  const snapshot = await getDocs(collection(db, "groupCalls", callId, "candidates", routeId));
+  const snapshot = await getDocs(collection(db, "groupCalls", callId, "candidates", routeId, "items"));
   for (const item of snapshot.docs) {
     await peer.addIceCandidate(new RTCIceCandidate(item.data())).catch(() => {});
   }
