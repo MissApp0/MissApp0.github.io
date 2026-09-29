@@ -237,23 +237,28 @@ service cloud.firestore {
 
       allow delete: if false;
 
-      match /offers/{uid} {
+      match /offers/{pairId} {
         allow read: if groupCallParticipant(callId);
 
         allow create, update: if groupCallParticipant(callId)
-          && request.auth.uid == get(
-            /databases/$(database)/documents/groupCalls/$(callId)
-          ).data.caller
-          && uid in get(
+          && request.resource.data.from == request.auth.uid
+          && request.resource.data.to is string
+          && request.resource.data.to != request.auth.uid
+          && request.resource.data.to in get(
             /databases/$(database)/documents/groupCalls/$(callId)
           ).data.participants;
       }
 
-      match /answers/{uid} {
+      match /answers/{pairId} {
         allow read: if groupCallParticipant(callId);
 
         allow create, update: if groupCallParticipant(callId)
-          && request.auth.uid == uid;
+          && request.resource.data.from == request.auth.uid
+          && request.resource.data.to is string
+          && request.resource.data.to != request.auth.uid
+          && request.resource.data.to in get(
+            /databases/$(database)/documents/groupCalls/$(callId)
+          ).data.participants;
       }
 
       match /declinedBy/{uid} {
