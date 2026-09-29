@@ -1322,22 +1322,15 @@ async function beginCall(video) {
 
   try {
     if (conversation.isGroup) {
-      await startGroupCall({
-        participantIds: conversation.participants.filter(uid => uid !== state.user.uid),
-        participantData: conversation.participantData,
-        groupName: conversation.name,
-        video
-      });
+      await startGroupCall({ participantIds: conversation.participants.filter(uid => uid !== state.user.uid), participantData: conversation.participantData, groupName: conversation.name, video });
+      await addCallMessage(conversation.id, video ? "video" : "voice", true);
       return;
     }
 
     const other = conversation.otherUser;
     if (!other?.uid) throw new Error("The other user could not be identified.");
-    await startCall({
-      calleeId: other.uid,
-      calleeName: other.username || other.displayName || other.email || "User",
-      video
-    });
+    await startCall({ calleeId: other.uid, calleeName: other.username || other.displayName || other.email || "User", video });
+    await addCallMessage(conversation.id, video ? "video" : "voice", false);
   } catch (error) {
     console.error("Start call error:", error);
     showToast(error?.message || "Could not start the call.", "error");
