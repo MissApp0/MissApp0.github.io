@@ -25,7 +25,9 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 import {
-  listenConversations
+  listenConversations,
+  createConversation,
+  createGroupConversation
 } from "./chat/conversations.js";
 
 import {
@@ -246,7 +248,10 @@ function createAppUI() {
       </div>
 
       <div class="search-container">
-        <input id="user-search" class="input" type="search" placeholder="Search or start new chat" autocomplete="off" aria-label="Search users">
+        <div class="chat-search-row">
+          <input id="user-search" class="input" type="search" placeholder="Search or start new chat" autocomplete="off" aria-label="Search users">
+          <button id="new-group-button" class="new-group-button" type="button" aria-label="Create group" title="Create group">＋</button>
+        </div>
         <div id="search-results" class="search-results"></div>
       </div>
     </div>
@@ -322,6 +327,7 @@ function setupEvents() {
   document.getElementById("logout-button")?.addEventListener("click", handleLogout);
   document.getElementById("connection-retry")?.addEventListener("click", retryConnection);
   document.getElementById("settings-button")?.addEventListener("click", openSettings);
+  document.getElementById("new-group-button")?.addEventListener("click", openGroupCreator);
   document.getElementById("user-search")?.addEventListener("input", handleSearch);
   document.getElementById("open-sidebar")?.addEventListener("click", openSidebar);
   document.getElementById("close-sidebar")?.addEventListener("click", closeSidebar);
@@ -475,6 +481,7 @@ function setupAuth() {
       startIncomingMessageListener();
       setupBrowserNotifications();
       initCalls();
+      initGroupCalls();
     } catch (error) {
       console.error("Application startup error:", error);
       showApp();
@@ -1185,9 +1192,11 @@ function renderConversations(docs) {
           : item;
 
       const id = item.id;
-      const otherUser = getOtherParticipant(data);
+      const isGroup = data.type === "group" || (data.participants?.length || 0) > 2;
+       const otherUser = getOtherParticipant(data);
 
       const name =
+        (isGroup ? data.name : null) ||
         otherUser.username ||
         otherUser.displayName ||
         otherUser.email ||
@@ -1279,6 +1288,7 @@ function openConversation(item) {
       : item;
 
   const conversationId = item.id;
+  const isGroup = data.type === "group" || (data.participants?.length || 0) > 2;
   const otherUser = getOtherParticipant(data);
 
   currentConversationId = conversationId;
@@ -1289,7 +1299,7 @@ function openConversation(item) {
     otherUser
   };
 
-  updateChatHeader(otherUser);
+  updateChatHeader(otherUser, data);
   enableComposer();
   renderConversationActive();
   listenToMessages(conversationId);
@@ -1299,14 +1309,26 @@ function openConversation(item) {
   closeSidebar();
 }
 
-async function beginCall(video) {
-  const other = state.currentConversation?.otherUser;
-  if (!other?.uid) {
+async async function beginCall(video) {
+  const conversation = state.currentConversation;
+  if (!conversation) {
     showToast("Open a conversation first.", "error");
     return;
   }
 
   try {
+    if (conversation.isGroup) {
+      await startGroupCall({
+        participantIds: conversation.participants.filter(uid => uid !== state.user.uid),
+        participantData: conversation.participantData,
+        groupName: conversation.name,
+        video
+      });
+      return;
+    }
+
+    const other = conversation.otherUser;
+    if (!other?.uid) throw new Error("The other user could not be identified.");
     await startCall({
       calleeId: other.uid,
       calleeName: other.username || other.displayName || other.email || "User",
@@ -1318,13 +1340,15 @@ async function beginCall(video) {
   }
 }
 
-function updateChatHeader(user) {
+function updateChatHeader(user, conversation = {}) {
   const name = document.getElementById("chat-name");
   const status = document.getElementById("chat-status");
   const avatar = document.getElementById("chat-avatar");
 
   const displayName =
-    user.username ||
+    conversation.type === "group" || conversation.participants?.length > 2
+      ? (conversation.name || "Group")
+      : user.username ||
     user.displayName ||
     user.email ||
     "User";
@@ -1335,17 +1359,21 @@ function updateChatHeader(user) {
 
   if (status) {
     status.textContent =
-      user.email ||
-      "MissApp user";
+      conversation.type === "group" || conversation.participants?.length > 2
+        ? `${conversation.participants?.length || 0} participants`
+        : (user.email || "MissApp user");
   }
 
   document.getElementById("voice-call-button")?.removeAttribute("disabled");
   document.getElementById("video-call-button")?.removeAttribute("disabled");
 
   if (avatar) {
-    avatar.textContent =
-      getInitial(displayName);
+    avatar.textContent = getInitial(displayName);
   }
+
+  const isGroup = conversation.type === "group" || conversation.participants?.length > 2;
+  document.getElementById("voice-call-button")?.classList.toggle("group-call", isGroup);
+  document.getElementById("video-call-button")?.classList.toggle("group-call", isGroup);
 }
 
 function renderConversationActive() {
@@ -2115,6 +2143,62 @@ async function hardRefreshApp() {
 }
 
 function closeSettings() { document.getElementById("settings-modal")?.remove(); }
+
+
+async function openGroupCreator() {
+  if (!state.user) return;
+  document.getElementById("group-creator")?.remove();
+  const modal = document.createElement("div");
+  modal.id = "group-creator";
+  modal.className = "group-creator-modal";
+  modal.innerHTML = `
+    <div class="group-creator-card" role="dialog" aria-modal="true" aria-labelledby="group-creator-title">
+      <div class="group-creator-head"><div><div class="group-creator-kicker">NEW GROUP</div><h2 id="group-creator-title">Create a group</h2></div><button id="group-creator-close" class="settings-close" type="button">×</button></div>
+      <input id="group-name-input" class="group-name-input" maxlength="60" placeholder="Group name" autocomplete="off">
+      <input id="group-member-search" class="group-name-input" placeholder="Add people…" autocomplete="off">
+      <div id="group-selected" class="group-selected"></div>
+      <div id="group-member-results" class="group-member-results"><div class="group-helper">Search for people to add.</div></div>
+      <div class="group-creator-actions"><button id="group-cancel" class="settings-reset" type="button">Cancel</button><button id="group-create" class="btn" type="button">Create group</button></div>
+    </div>`;
+  document.body.appendChild(modal);
+  const selected = new Map();
+  const search = modal.querySelector("#group-member-search");
+  const results = modal.querySelector("#group-member-results");
+  const selectedBox = modal.querySelector("#group-selected");
+  const renderSelected = () => {
+    selectedBox.innerHTML = [...selected.values()].map(u => `<button type="button" class="group-chip" data-remove="${escapeHTML(u.uid)}">${escapeHTML(u.displayName || u.username || u.email || "User")} ×</button>`).join("");
+    selectedBox.querySelectorAll("[data-remove]").forEach(b => b.onclick = () => { selected.delete(b.dataset.remove); renderSelected(); });
+  };
+  const renderResults = users => {
+    const list = users.filter(u => u.uid !== state.user.uid && !selected.has(u.uid)).slice(0, 12);
+    results.innerHTML = list.length ? list.map(u => `<button type="button" class="group-member" data-add="${escapeHTML(u.uid)}"><span class="conversation-avatar">${escapeHTML(getInitial(u.displayName || u.username || u.email))}</span><span><strong>${escapeHTML(u.displayName || u.username || u.email || "User")}</strong><small>${escapeHTML(u.email || "")}</small></span></button>`).join("") : '<div class="group-helper">No people found.</div>';
+    results.querySelectorAll("[data-add]").forEach(b => b.onclick = () => { const u = list.find(x => x.uid === b.dataset.add); if (u) selected.set(u.uid,u); renderSelected(); renderResults(list); });
+  };
+  let timer;
+  search.addEventListener("input", () => {
+    clearTimeout(timer);
+    const term = search.value.trim().toLowerCase();
+    if (!term) { results.innerHTML = '<div class="group-helper">Search for people to add.</div>'; return; }
+    results.innerHTML = '<div class="group-helper">Searching…</div>';
+    timer = setTimeout(async () => { try { renderResults(await searchUsers(term)); } catch { results.innerHTML = '<div class="group-helper">Search failed.</div>'; } }, 220);
+  });
+  modal.querySelector("#group-creator-close").onclick = () => modal.remove();
+  modal.querySelector("#group-cancel").onclick = () => modal.remove();
+  modal.querySelector("#group-create").onclick = async () => {
+    const name = modal.querySelector("#group-name-input").value.trim();
+    if (!name) { showToast("Give the group a name.", "error"); return; }
+    if (selected.size < 2) { showToast("Add at least two people.", "error"); return; }
+    const button = modal.querySelector("#group-create");
+    button.disabled = true; button.textContent = "Creating…";
+    try {
+      const conversation = await createGroupConversation(name, [...selected.keys()]);
+      const snap = await getDoc(doc(db, "conversations", conversation.id));
+      modal.remove();
+      if (snap.exists()) openConversation({ id: snap.id, data: snap.data() });
+      showToast("Group created.", "success");
+    } catch (error) { button.disabled = false; button.textContent = "Create group"; showToast(getFirestoreError(error), "error"); }
+  };
+}
 
 function getAuthError(error) {
   switch (error?.code) {
