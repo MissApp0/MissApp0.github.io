@@ -121,51 +121,90 @@ export async function startGroupCall({ participantIds, participantData = {}, gro
 
     active = { ...call, stream, peers: new Map(), remoteStreams: new Map(), unsubscribers: [], role: "caller" };
     showScreen(active);
-
-    for (const uid of participants.slice(1)) await createCallerPeer(uid);
+    await setupGroupMesh();
   } catch (error) {
     stream.getTracks().forEach(track => track.stop());
     throw error;
   }
 }
 
-async function createCallerPeer(uid) {
-  if (!active) return;
+async function setupGroupMesh() {
+  if (!active || !auth.currentUser) return;
+
+  const uid = auth.currentUser.uid;
+  for (const remoteUid of active.participants) {
+    if (!remoteUid || remoteUid === uid) continue;
+
+    // One deterministic initiator per pair prevents offer collisions.
+    if (uid < remoteUid) {
+      await createMeshOffer(remoteUid);
+    } else {
+      await listenForMeshOffer(remoteUid);
+    }
+  }
+}
+
+function pairId(a, b) {
+  return [a, b].sort().join("_");
+}
+
+async function createMeshOffer(remoteUid) {
+  if (!active || active.peers.has(remoteUid)) return;
+
+  const uid = auth.currentUser.uid;
   const callId = active.id;
   const peer = new RTCPeerConnection(rtcConfig);
-  active.peers.set(uid, peer);
+  active.peers.set(remoteUid, peer);
+
   active.stream.getTracks().forEach(track => peer.addTrack(track, active.stream));
 
   const remoteStream = new MediaStream();
-  active.remoteStreams.set(uid, remoteStream);
+  active.remoteStreams.set(remoteUid, remoteStream);
   peer.ontrack = event => {
     event.streams[0]?.getTracks().forEach(track => remoteStream.addTrack(track));
-    attachRemote(uid, remoteStream, active.participantData?.[uid]);
+    attachRemote(remoteUid, remoteStream, active.participantData?.[remoteUid]);
   };
+
   peer.onicecandidate = async event => {
     if (!event.candidate) return;
-    await addDoc(collection(db, "groupCalls", callId, "candidates", route(active.caller, uid), "items"), event.candidate.toJSON());
+    try {
+      await addDoc(
+        collection(db, "groupCalls", callId, "candidates", route(uid, remoteUid), "items"),
+        event.candidate.toJSON()
+      );
+    } catch (error) {
+      console.error("Group call candidate write error:", error);
+    }
   };
 
   const offer = await peer.createOffer();
   await peer.setLocalDescription(offer);
-  await setDoc(doc(db, "groupCalls", callId, "offers", uid), {
-    type: offer.type, sdp: offer.sdp
-  });
 
-  const answerUnsub = onSnapshot(doc(db, "groupCalls", callId, "answers", uid), async snapshot => {
-    const data = snapshot.data();
-    if (!data || peer.currentRemoteDescription) return;
-    try {
-      await peer.setRemoteDescription(new RTCSessionDescription(data));
-      await flushCandidates(callId, route(uid, active.caller), peer);
-    } catch (error) {
-      console.error("Group call answer error:", error);
+  const signal = {
+    from: uid,
+    to: remoteUid,
+    type: offer.type,
+    sdp: offer.sdp
+  };
+
+  await setDoc(doc(db, "groupCalls", callId, "offers", pairId(uid, remoteUid)), signal);
+
+  const answerUnsub = onSnapshot(
+    doc(db, "groupCalls", callId, "answers", pairId(uid, remoteUid)),
+    async snapshot => {
+      const data = snapshot.data();
+      if (!data || peer.currentRemoteDescription) return;
+      try {
+        await peer.setRemoteDescription(new RTCSessionDescription(data));
+        await flushCandidates(callId, route(remoteUid, uid), peer);
+      } catch (error) {
+        console.error("Group call answer error:", error);
+      }
     }
-  });
+  );
 
   const candidateUnsub = onSnapshot(
-    collection(db, "groupCalls", callId, "candidates", route(uid, active.caller), "items"),
+    collection(db, "groupCalls", callId, "candidates", route(remoteUid, uid), "items"),
     snapshot => snapshot.docChanges().forEach(change => {
       if (change.type === "added") {
         peer.addIceCandidate(new RTCIceCandidate(change.doc.data())).catch(() => {});
@@ -174,6 +213,74 @@ async function createCallerPeer(uid) {
   );
 
   active.unsubscribers.push(answerUnsub, candidateUnsub);
+}
+
+async function listenForMeshOffer(remoteUid) {
+  if (!active || active.peers.has(remoteUid)) return;
+
+  const uid = auth.currentUser.uid;
+  const callId = active.id;
+  const offerRef = doc(db, "groupCalls", callId, "offers", pairId(uid, remoteUid));
+
+  const offerUnsub = onSnapshot(offerRef, async snapshot => {
+    const data = snapshot.data();
+    if (!data || data.from !== remoteUid || data.to !== uid || active.peers.has(remoteUid)) return;
+
+    const peer = new RTCPeerConnection(rtcConfig);
+    active.peers.set(remoteUid, peer);
+    active.stream.getTracks().forEach(track => peer.addTrack(track, active.stream));
+
+    const remoteStream = new MediaStream();
+    active.remoteStreams.set(remoteUid, remoteStream);
+    peer.ontrack = event => {
+      event.streams[0]?.getTracks().forEach(track => remoteStream.addTrack(track));
+      attachRemote(remoteUid, remoteStream, active.participantData?.[remoteUid]);
+    };
+
+    peer.onicecandidate = async event => {
+      if (!event.candidate) return;
+      try {
+        await addDoc(
+          collection(db, "groupCalls", callId, "candidates", route(uid, remoteUid), "items"),
+          event.candidate.toJSON()
+        );
+      } catch (error) {
+        console.error("Group call candidate write error:", error);
+      }
+    };
+
+    try {
+      await peer.setRemoteDescription(new RTCSessionDescription(data));
+      await flushCandidates(callId, route(remoteUid, uid), peer);
+
+      const answer = await peer.createAnswer();
+      await peer.setLocalDescription(answer);
+
+      await setDoc(doc(db, "groupCalls", callId, "answers", pairId(uid, remoteUid)), {
+        from: uid,
+        to: remoteUid,
+        type: answer.type,
+        sdp: answer.sdp
+      });
+    } catch (error) {
+      active.peers.delete(remoteUid);
+      active.remoteStreams.delete(remoteUid);
+      peer.close();
+      console.error("Group call offer handling error:", error);
+    }
+
+    const candidateUnsub = onSnapshot(
+      collection(db, "groupCalls", callId, "candidates", route(remoteUid, uid), "items"),
+      snapshot => snapshot.docChanges().forEach(change => {
+        if (change.type === "added") {
+          peer.addIceCandidate(new RTCIceCandidate(change.doc.data())).catch(() => {});
+        }
+      })
+    );
+    active.unsubscribers.push(candidateUnsub);
+  });
+
+  active.unsubscribers.push(offerUnsub);
 }
 
 async function waitForGroupOffer(callId, uid, attempts = 20, delayMs = 500) {
@@ -190,38 +297,14 @@ async function waitForGroupOffer(callId, uid, attempts = 20, delayMs = 500) {
 
 async function answerGroupCall(call) {
   if (active || !auth.currentUser) return;
-  const uid = auth.currentUser.uid;
-  const offerSnapshot = await waitForGroupOffer(call.id, uid);
-  if (!offerSnapshot) throw new Error("The group call offer is not available yet. Please try accepting again.");
 
   const stream = await media(call.type === "video");
-  const peer = new RTCPeerConnection(rtcConfig);
-  stream.getTracks().forEach(track => peer.addTrack(track, stream));
-
-  const remoteStream = new MediaStream();
-  peer.ontrack = event => {
-    event.streams[0]?.getTracks().forEach(track => remoteStream.addTrack(track));
-    attachRemote(call.caller, remoteStream, call.participantData?.[call.caller]);
-  };
-  peer.onicecandidate = async event => {
-    if (!event.candidate) return;
-    await addDoc(collection(db, "groupCalls", call.id, "candidates", route(uid, call.caller), "items"), event.candidate.toJSON());
-  };
-
-  await peer.setRemoteDescription(new RTCSessionDescription(offerSnapshot.data()));
-  await flushCandidates(call.id, route(call.caller, uid), peer);
-
-  const answer = await peer.createAnswer();
-  await peer.setLocalDescription(answer);
-  await setDoc(doc(db, "groupCalls", call.id, "answers", uid), {
-    type: answer.type, sdp: answer.sdp
-  });
 
   active = {
     ...call,
     stream,
-    peers: new Map([[call.caller, peer]]),
-    remoteStreams: new Map([[call.caller, remoteStream]]),
+    peers: new Map(),
+    remoteStreams: new Map(),
     unsubscribers: [],
     role: "callee"
   };
@@ -230,18 +313,13 @@ async function answerGroupCall(call) {
     const data = snapshot.data();
     if (!data || ["ended", "declined"].includes(data.status)) endGroupCall(false);
   });
-  const candidateUnsub = onSnapshot(
-    collection(db, "groupCalls", call.id, "candidates", route(call.caller, uid), "items"),
-    snapshot => snapshot.docChanges().forEach(change => {
-      if (change.type === "added") peer.addIceCandidate(new RTCIceCandidate(change.doc.data())).catch(() => {});
-    })
-  );
-  active.unsubscribers.push(stateUnsub, candidateUnsub);
+  active.unsubscribers.push(stateUnsub);
 
   hideIncoming();
   showScreen(active);
-}
 
+  await setupGroupMesh();
+}
 async function flushCandidates(callId, routeId, peer) {
   const snapshot = await getDocs(collection(db, "groupCalls", callId, "candidates", routeId, "items"));
   for (const item of snapshot.docs) {
