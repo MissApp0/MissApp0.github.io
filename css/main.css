@@ -335,3 +335,12 @@ button, input, textarea, select, .btn {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior:auto !important; animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
 }
+
+/* Chat typing and call history */
+.typing-indicator { min-height: 20px; padding: 2px 12px; font-size: 12px; opacity: 0; transition: opacity .15s ease; }
+.typing-indicator.visible { opacity: .7; }
+.call-message { display: flex; align-items: center; gap: 10px; position: relative; padding-right: 8px; }
+.call-message-icon { font-size: 20px; }
+.call-message-copy { display: flex; flex-direction: column; gap: 2px; min-width: 110px; }
+.call-message-copy span { font-size: 12px; opacity: .7; }
+.call-rejoin-button { border: 0; border-radius: 8px; padding: 6px 10px; cursor: pointer; font: inherit; }
