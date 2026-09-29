@@ -1394,6 +1394,9 @@ function renderConversationActive() {
 
 function listenToMessages(conversationId) {
   unsubscribeMessages?.();
+  typingUnsubscribe?.();
+  typingUnsubscribe = null;
+  clearTimeout(typingStopTimer);
   messageListenerReady = false;
 
   const messagesRef = collection(
@@ -1655,6 +1658,7 @@ function handleMessageInput() {
     ) + "px";
 
   updateMessageCounter();
+  setTypingState(Boolean(input.value.trim()));
 }
 
 function updateMessageCounter() {
