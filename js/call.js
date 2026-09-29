@@ -492,6 +492,15 @@ export async function endActiveCall(notify = true) {
 }
 
 function showIncomingCall(call) {
+  if (window.missappDesktop?.showIncomingCall) {
+    window.missappDesktop.showIncomingCall({
+      callId: call.id,
+      callerName: call.callerName || "User",
+      type: call.type || "voice",
+      title: call.type === "video" ? "Incoming video call" : "Incoming voice call"
+    });
+    return;
+  }
   const existing = document.getElementById("incoming-call");
   if (existing) existing.remove();
 
@@ -661,3 +670,15 @@ window.MissAppCalls = {
   endActiveCall,
   getCallCapabilities
 };
+\nif (window.missappDesktop?.onCallAction) {
+  window.missappDesktop.onCallAction(async action => {
+    if (action?.type === "accept" && action.callId) {
+      const snapshot = await getDoc(doc(db, "calls", action.callId));
+      if (snapshot.exists()) await answerCall({ id: action.callId, ...snapshot.data() });
+    } else if (action?.type === "decline" && action.callId) {
+      await declineCall(action.callId);
+    } else if (action?.type === "end") {
+      await endActiveCall(true);
+    }
+  });
+}
