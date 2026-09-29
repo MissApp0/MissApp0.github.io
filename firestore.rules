@@ -93,6 +93,13 @@ service cloud.firestore {
           && request.auth.uid in get(/databases/$(database)/documents/groupCalls/$(callId)).data.participants;
       }
 
+      match /declinedBy/{uid} {
+        allow read: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/groupCalls/$(callId)).data.participants;
+        allow create: if signedIn()
+          && request.auth.uid == uid
+          && request.auth.uid in get(/databases/$(database)/documents/groupCalls/$(callId)).data.participants;
+      }
+
       match /candidates/{routeId}/{candidateId} {
         allow read: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/groupCalls/$(callId)).data.participants;
         allow create: if signedIn()
