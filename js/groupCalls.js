@@ -468,12 +468,16 @@ export async function endGroupCall(notify = true) {
   if (notify) {
     try { await updateDoc(doc(db, "groupCalls", call.id), { status: "ended", endedAt: serverTimestamp() }); } catch {}
   }
-  if (call.messageId && call.conversationId) {
-    try {
-      await deleteDoc(doc(db, "conversations", call.conversationId, "messages", call.messageId));
-    } catch (error) {
-      console.debug("Group call history cleanup failed:", error);
+  try {
+    const callSnapshot = await getDoc(doc(db, "groupCalls", call.id));
+    const callData = callSnapshot.exists() ? callSnapshot.data() : {};
+    const messageId = call.messageId || callData.messageId;
+    const conversationId = call.conversationId || callData.conversationId;
+    if (messageId && conversationId) {
+      await deleteDoc(doc(db, "conversations", conversationId, "messages", messageId));
     }
+  } catch (error) {
+    console.debug("Group call history cleanup failed:", error);
   }
   call.unsubscribers?.forEach(unsubscribe => unsubscribe());
   call.peers?.forEach(peer => peer.close());
