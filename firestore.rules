@@ -35,12 +35,6 @@ service cloud.firestore {
         && participants.size() <= 25;
     }
 
-    /*
-     * User profiles
-     *
-     * Profiles are intentionally readable by authenticated users because
-     * MissApp searches users by username/email and displays participant data.
-     */
     match /users/{uid} {
       allow read: if signedIn();
 
@@ -56,9 +50,6 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    /*
-     * Status / stories
-     */
     match /statuses/{statusId} {
       allow read: if signedIn()
         && resource.data.expiresAt is timestamp
@@ -76,6 +67,13 @@ service cloud.firestore {
       allow update: if signedIn()
         && resource.data.authorId == request.auth.uid
         && request.resource.data.authorId == resource.data.authorId
+        && request.resource.data.expiresAt == resource.data.expiresAt
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "text",
+          "background",
+          "authorName"
+        ])
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0
         && request.resource.data.text.size() <= 500;
@@ -100,14 +98,6 @@ service cloud.firestore {
       }
     }
 
-    /*
-     * One-to-one and group conversations
-     *
-     * The conversation list uses:
-     *   participants array-contains currentUserUid
-     *
-     * Firestore can prove this query against the rule below.
-     */
     match /conversations/{conversationId} {
       allow read: if isParticipant(resource.data.participants);
 
@@ -116,7 +106,12 @@ service cloud.firestore {
         && request.auth.uid in request.resource.data.participants;
 
       allow update: if isParticipant(resource.data.participants)
-        && request.resource.data.participants == resource.data.participants;
+        && request.resource.data.participants == resource.data.participants
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "lastMessage",
+          "lastMessageAt",
+          "updatedAt"
+        ]);
 
       allow delete: if false;
 
@@ -151,9 +146,6 @@ service cloud.firestore {
       }
     }
 
-    /*
-     * Normal one-to-one WebRTC calls
-     */
     match /calls/{callId} {
       allow read: if signedIn()
         && (
@@ -172,7 +164,13 @@ service cloud.firestore {
           || resource.data.callee == request.auth.uid
         )
         && request.resource.data.caller == resource.data.caller
-        && request.resource.data.callee == resource.data.callee;
+        && request.resource.data.callee == resource.data.callee
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "offer",
+          "answer",
+          "status",
+          "endedAt"
+        ]);
 
       allow delete: if false;
 
@@ -203,16 +201,6 @@ service cloud.firestore {
       }
     }
 
-    /*
-     * Group WebRTC calls
-     *
-     * Layout used by the app:
-     * groupCalls/{callId}
-     * groupCalls/{callId}/offers/{uid}
-     * groupCalls/{callId}/answers/{uid}
-     * groupCalls/{callId}/declinedBy/{uid}
-     * groupCalls/{callId}/candidates/{routeId}/items/{candidateId}
-     */
     match /groupCalls/{callId} {
       allow read: if groupCallParticipant(callId);
 
@@ -226,7 +214,11 @@ service cloud.firestore {
 
       allow update: if groupCallParticipant(callId)
         && request.resource.data.caller == resource.data.caller
-        && request.resource.data.participants == resource.data.participants;
+        && request.resource.data.participants == resource.data.participants
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "status",
+          "endedAt"
+        ]);
 
       allow delete: if false;
 
