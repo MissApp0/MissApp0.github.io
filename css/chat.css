@@ -773,3 +773,17 @@
     padding-bottom:max(8px, env(safe-area-inset-bottom));
   }
 }
+
+/* Cleaner navigation and group UI */
+.chat-search-row { display:flex; align-items:center; gap:7px; }
+.chat-search-row .search-input, .chat-search-row input { flex:1; min-width:0; }
+.new-group-button { width:40px; height:40px; flex:0 0 40px; border-radius:12px; background:#fff; color:#087f66; font-size:23px; box-shadow:0 2px 8px rgba(20,35,43,.06); }
+.new-group-button:hover { background:#eaf7f3; transform:translateY(-1px); }
+.conversation, .search-result { transition:transform var(--motion-fast) var(--ease-standard), background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease; }
+.conversation:not(.active):hover { transform:translateX(2px); }
+#sidebar { transition:transform var(--motion-slow) var(--ease-emphasized), box-shadow var(--motion-base) ease; }
+#chat { transition:opacity var(--motion-base) ease, transform var(--motion-slow) var(--ease-emphasized); }
+.message-row { animation:message-in 180ms var(--ease-emphasized) both; }
+@keyframes message-in { from { opacity:0; transform:translateY(5px) scale(.995) } to { opacity:1; transform:none } }
+.call-modal, .active-call { animation:surface-in var(--motion-base) ease; }
+.call-modal > *, .incoming-call-card { animation:card-in var(--motion-slow) var(--ease-emphasized); }
