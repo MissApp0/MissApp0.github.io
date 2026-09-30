@@ -681,7 +681,7 @@ export function playSound(name) {
 
   const isRing = RING_SOUNDS.includes(name);
 
-  if (isRing && ringtone?.type === "mp3") return playMp3Ringtone(name);
+  // Custom ringtones are for incoming calls only. Outgoing call ringing uses the built-in sound.
 
   const ctx = getAudioContext();
   if (!ctx || ctx.state !== "running") {
@@ -689,7 +689,7 @@ export function playSound(name) {
     return false;
   }
 
-  if (isRing && ringtone?.type === "midi" && getMidiPlan()) return playMidiRingtone();
+  if (name === "incomingCall" && ringtone?.type === "midi" && getMidiPlan()) return playMidiRingtone();
 
   const pattern = patterns[settings.soundType]?.[name] || patterns.classic[name];
   if (!pattern) return false;
