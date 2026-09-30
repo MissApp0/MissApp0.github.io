@@ -9,13 +9,180 @@ const defaults = {
   incomingCall: true,
   callRinging: true,
   callConnected: true,
-  status: true
+  status: true,
+  doNotDisturb: false,
+  customRingtone: null
 };
 
 let settings = loadSettings();
 let audioContext = null;
 let audioUnlocked = false;
 let pendingSounds = [];
+let customRingtoneUrl = null;
+let customRingtoneBuffer = null;
+let customRingtoneName = "";
+let customRingtoneType = "";
+
+const RINGTONE_DB = "missapp-ringtones";
+const RINGTONE_STORE = "files";
+
+function openRingtoneDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(RINGTONE_DB, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(RINGTONE_STORE);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function loadCustomRingtone() {
+  if (customRingtoneBuffer) return;
+  try {
+    const db = await openRingtoneDb();
+    const data = await new Promise((resolve, reject) => {
+      const tx = db.transaction(RINGTONE_STORE, "readonly");
+      const request = tx.objectStore(RINGTONE_STORE).get("custom");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
+    if (!data?.buffer) return;
+    customRingtoneBuffer = data.buffer;
+    customRingtoneName = data.name || "Custom ringtone";
+    customRingtoneType = data.type || "";
+    settings.customRingtone = { name: customRingtoneName, type: customRingtoneType };
+  } catch (error) {
+    console.warn("MissApp custom ringtone load failed:", error);
+  }
+}
+
+export async function importCustomRingtone(file) {
+  if (!file) throw new Error("Choose a ringtone file first.");
+  const type = String(file.type || "").toLowerCase();
+  const name = String(file.name || "ringtone");
+  const extension = name.split(".").pop()?.toLowerCase();
+  const isMp3 = type === "audio/mpeg" || extension === "mp3";
+  const isMidi = ["mid", "midi"].includes(extension) || type.includes("midi");
+  if (!isMp3 && !isMidi) throw new Error("Only MP3 and MIDI files can be used as custom ringtones.");
+  const buffer = await file.arrayBuffer();
+  const db = await openRingtoneDb();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(RINGTONE_STORE, "readwrite");
+    tx.objectStore(RINGTONE_STORE).put({ buffer, name, type: isMp3 ? "mp3" : "midi" }, "custom");
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+  customRingtoneBuffer = buffer;
+  customRingtoneName = name;
+  customRingtoneType = isMp3 ? "mp3" : "midi";
+  settings.customRingtone = { name, type: customRingtoneType };
+  persist();
+  return { name, type: customRingtoneType };
+}
+
+export async function clearCustomRingtone() {
+  try {
+    const db = await openRingtoneDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(RINGTONE_STORE, "readwrite");
+      tx.objectStore(RINGTONE_STORE).delete("custom");
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch (error) {
+    console.warn("MissApp custom ringtone clear failed:", error);
+  }
+  if (customRingtoneUrl) URL.revokeObjectURL(customRingtoneUrl);
+  customRingtoneUrl = null;
+  customRingtoneBuffer = null;
+  customRingtoneName = "";
+  customRingtoneType = "";
+  settings.customRingtone = null;
+  persist();
+}
+
+function playMp3Ringtone() {
+  if (!customRingtoneBuffer) return false;
+  if (customRingtoneUrl) URL.revokeObjectURL(customRingtoneUrl);
+  const blob = new Blob([customRingtoneBuffer], { type: "audio/mpeg" });
+  customRingtoneUrl = URL.createObjectURL(blob);
+  const audio = new Audio(customRingtoneUrl);
+  audio.volume = settings.volume;
+  audio.loop = false;
+  audio.play().catch(() => {});
+  audio.addEventListener("ended", () => URL.revokeObjectURL(customRingtoneUrl), { once: true });
+  return true;
+}
+
+function readMidiEvents(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const text = String.fromCharCode(...bytes.slice(0, 4));
+  if (text !== "MThd") throw new Error("Invalid MIDI file.");
+  const view = new DataView(buffer);
+  const tracks = view.getUint16(10);
+  const division = view.getUint16(12);
+  let offset = 14;
+  const events = [];
+  for (let track = 0; track < tracks; track++) {
+    if (String.fromCharCode(...bytes.slice(offset, offset + 4)) !== "MTrk") break;
+    const length = view.getUint32(offset + 4);
+    let p = offset + 8;
+    const end = p + length;
+    let tick = 0;
+    let status = 0;
+    while (p < end) {
+      let delta = 0, b;
+      do { b = bytes[p++]; delta = (delta << 7) | (b & 0x7f); } while (b & 0x80 && p < end);
+      tick += delta;
+      let type = bytes[p];
+      if (type < 0x80) type = status; else { p++; status = type; }
+      const command = type & 0xf0;
+      if (command === 0x90 || command === 0x80) {
+        const note = bytes[p++];
+        const velocity = bytes[p++];
+        if (command === 0x90 && velocity) events.push({ tick, note, velocity, on: true });
+        else events.push({ tick, note, velocity, on: false });
+      } else if (command === 0xa0 || command === 0xb0 || command === 0xe0) p += 2;
+      else if (command === 0xc0 || command === 0xd0) p += 1;
+      else if (type === 0xff) { const meta = bytes[p++]; let len = 0, q; do { q = bytes[p++]; len = (len << 7) | (q & 0x7f); } while (q & 0x80); p += len; }
+      else if (type === 0xf0 || type === 0xf7) { let len = 0, q; do { q = bytes[p++]; len = (len << 7) | (q & 0x7f); } while (q & 0x80); p += len; }
+      else break;
+    }
+    offset = end;
+  }
+  return { events, division: division & 0x7fff };
+}
+
+function playMidiRingtone() {
+  const ctx = getAudioContext();
+  if (!ctx || ctx.state !== "running" || !customRingtoneBuffer) return false;
+  try {
+    const midi = readMidiEvents(customRingtoneBuffer);
+    const now = ctx.currentTime;
+    const secondsPerTick = 0.5 / Math.max(1, midi.division);
+    midi.events.slice(0, 250).forEach(event => {
+      const time = now + Math.min(8, event.tick * secondsPerTick);
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 440 * Math.pow(2, (event.note - 69) / 12);
+      const duration = 0.18;
+      gain.gain.setValueAtTime(event.on ? Math.max(.01, settings.volume * .16) : .0001, time);
+      gain.gain.exponentialRampToValueAtTime(.0001, time + duration);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(time);
+      osc.stop(time + duration + .03);
+    });
+    return true;
+  } catch (error) {
+    console.warn("MissApp MIDI ringtone playback failed:", error);
+    return false;
+  }
+}
+
+loadCustomRingtone();
 
 function loadSettings() {
   try {
@@ -95,6 +262,11 @@ export const soundTypes = {
 
 export function playSound(name) {
   if (!settings.enabled || settings.volume <= 0 || settings[name] === false) return false;
+  if (settings.doNotDisturb && ["messageReceived", "incomingCall", "callRinging", "status"].includes(name)) return false;
+  if ((name === "incomingCall" || name === "callRinging") && customRingtoneBuffer) {
+    if (customRingtoneType === "mp3") return playMp3Ringtone();
+    if (customRingtoneType === "midi") return playMidiRingtone();
+  }
 
   const ctx = getAudioContext();
   if (!ctx || ctx.state !== "running") {
@@ -160,6 +332,10 @@ export function updateSoundSettings(patch = {}) {
   settings = { ...settings, ...patch };
   persist();
   return getSoundSettings();
+}
+
+export function isDoNotDisturb() {
+  return Boolean(settings.doNotDisturb);
 }
 
 export function resetSoundSettings() {
