@@ -2498,7 +2498,12 @@ function setupSettingsEvents() {
     }
   });
 
-  modal.querySelector("#custom-ringtone-preview")?.addEventListener("click", async event => {\n    const played = await previewCustomRingtone();\n    if (!played) showToast("Could not play the custom ringtone.", "error");\n  });\n\n  modal.querySelector("#custom-ringtone-remove")?.addEventListener("click", async event => {
+  modal.querySelector("#custom-ringtone-preview")?.addEventListener("click", async () => {
+    const played = await previewCustomRingtone();
+    if (!played) showToast("Could not play the custom ringtone.", "error");
+  });
+
+  modal.querySelector("#custom-ringtone-remove")?.addEventListener("click", async event => {
     await clearCustomRingtone();
     modal.querySelector("#custom-ringtone-name").textContent = "Using MissApp default";
     event.currentTarget.disabled = true;
