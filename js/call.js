@@ -93,31 +93,78 @@ async function switchCamera() {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { deviceId: { exact: next.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } });
   await replaceVideoTrack(call, stream.getVideoTracks()[0]);
 }
+function isMobileCallDevice() {
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
+}
+
 async function toggleScreenShare() {
   const call = activeCall;
-  if (!call?.peer || !navigator.mediaDevices?.getDisplayMedia) { setCallStatus("Screen sharing is not supported in this browser."); return; }
+  if (!call?.peer) return;
   const sender = call.peer.getSenders().find(item => item.track?.kind === "video");
   if (!sender) { setCallStatus("Screen sharing requires a video call."); return; }
+
   if (call.screenTrack) {
     const camera = call.cameraTrack;
     if (camera) await sender.replaceTrack(camera);
     call.screenTrack.stop();
     call.screenTrack = null;
+    document.getElementById("local-video")?.setAttribute("srcObject", call.stream);
     const local = document.getElementById("local-video");
     if (local) local.srcObject = call.stream;
+    setCallStatus("Connected");
     return;
   }
-  const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
-  const screenTrack = display.getVideoTracks()[0];
-  call.cameraTrack = call.stream.getVideoTracks()[0];
-  call.screenTrack = screenTrack;
-  await sender.replaceTrack(screenTrack);
-  const local = document.getElementById("local-video");
-  if (local) {
-    const preview = new MediaStream([...call.stream.getAudioTracks(), screenTrack]);
-    local.srcObject = preview;
+
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    setCallStatus(isMobileCallDevice()
+      ? "Your mobile browser does not provide screen sharing."
+      : "Screen sharing is not supported in this browser.");
+    return;
   }
-  screenTrack.onended = () => { if (activeCall?.id === call.id) toggleScreenShare().catch(() => {}); };
+
+  try {
+    const display = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: { ideal: 20, max: 30 } },
+      audio: false
+    });
+    const screenTrack = display.getVideoTracks()[0];
+    if (!screenTrack) throw new Error("No screen track was returned.");
+    call.cameraTrack = call.stream.getVideoTracks()[0];
+    call.screenTrack = screenTrack;
+    await sender.replaceTrack(screenTrack);
+    const local = document.getElementById("local-video");
+    if (local) local.srcObject = new MediaStream([...call.stream.getAudioTracks(), screenTrack]);
+    screenTrack.onended = () => { if (activeCall?.id === call.id) toggleScreenShare().catch(() => {}); };
+    setCallStatus("Sharing screen");
+  } catch (error) {
+    if (error?.name === "NotAllowedError" || error?.name === "AbortError") {
+      setCallStatus("Screen sharing was cancelled.");
+      return;
+    }
+    console.error("Screen share error:", error);
+    setCallStatus(isMobileCallDevice()
+      ? "Mobile screen sharing is unavailable on this browser."
+      : "Could not start screen sharing.");
+  }
+}
+
+function showLaserPointer(call, x, y) {
+  const screen = document.getElementById("active-call");
+  if (!screen) return;
+  let pointer = screen.querySelector(".remote-laser-pointer");
+  if (!pointer) {
+    pointer = document.createElement("div");
+    pointer.className = "remote-laser-pointer";
+    screen.appendChild(pointer);
+  }
+  pointer.style.left = (x * 100) + "%";
+  pointer.style.top = (y * 100) + "%";
+}
+
+function sendLaserPointer(call, x, y) {
+  if (call?.dataChannel?.readyState === "open") {
+    call.dataChannel.send(JSON.stringify({ type: "laser", x, y }));
+  }
 }
 function clearCallTimeout() {
   if (callTimeout) {
@@ -351,6 +398,19 @@ export async function startCall({ calleeId, calleeName, video = false }) {
   attachPeerMonitoring(peer, call);
 
   const remoteStream = new MediaStream();
+  const dataChannel = peer.createDataChannel("missapp-controls");
+  dataChannel.onmessage = event => {
+    try {
+      const message = JSON.parse(event.data);
+      if (message.type === "laser") showLaserPointer(activeCall, message.x, message.y);
+      if (message.type === "laser-off") document.getElementById("active-call")?.querySelector(".remote-laser-pointer")?.remove();
+    } catch {}
+  };
+
+  peer.ondatachannel = event => {
+    if (event.channel.label !== "missapp-controls") return;
+    event.channel.onmessage = dataChannel.onmessage;
+  };
 
   peer.ontrack = event => {
     event.streams[0]?.getTracks().forEach(track => remoteStream.addTrack(track));
@@ -403,6 +463,18 @@ async function answerCall(call) {
   stream.getTracks().forEach(track => peer.addTrack(track, stream));
 
   const remoteStream = new MediaStream();
+  peer.ondatachannel = event => {
+    if (event.channel.label !== "missapp-controls") return;
+    activeCall = activeCall || { id: call.id };
+    activeCall.dataChannel = event.channel;
+    event.channel.onmessage = dataEvent => {
+      try {
+        const message = JSON.parse(dataEvent.data);
+        if (message.type === "laser") showLaserPointer(activeCall, message.x, message.y);
+        if (message.type === "laser-off") document.getElementById("active-call")?.querySelector(".remote-laser-pointer")?.remove();
+      } catch {}
+    };
+  };
 
   peer.ontrack = event => {
     event.streams[0]?.getTracks().forEach(track => remoteStream.addTrack(track));
@@ -653,7 +725,7 @@ function showCallScreen(call) {
         <button id="call-options-button" class="call-control call-options-button" type="button" title="Call options" aria-label="Call options" aria-expanded="false">⋮</button>
         <div id="call-options-menu" class="call-options-menu hidden" role="menu">
           <button id="call-menu-mic" type="button" role="menuitem">🎙 Mute microphone</button>
-          ${call.type === "video" ? '<button id="call-menu-camera" type="button" role="menuitem">📹 Camera</button><button id="call-menu-switch-camera" type="button" role="menuitem">🔄 Switch camera</button><button id="call-menu-share-screen" type="button" role="menuitem">🖥 Share screen</button>' : ""}
+          ${call.type === "video" ? '<button id="call-menu-camera" type="button" role="menuitem">📹 Camera</button><button id="call-menu-switch-camera" type="button" role="menuitem">🔄 Switch camera</button><button id="call-menu-share-screen" type="button" role="menuitem">🖥 Share screen</button><button id="call-menu-laser" type="button" role="menuitem">🔴 Laser pointer</button>' : ""}
         </div>
       </div>
     </div>
@@ -693,6 +765,27 @@ function showCallScreen(call) {
 
   screen.querySelector("#call-menu-switch-camera")?.addEventListener("click", async () => {
     try { await switchCamera(); } catch (error) { console.error("Switch camera error:", error); setCallStatus("Could not switch camera."); }
+  });
+
+  screen.querySelector("#call-menu-laser")?.addEventListener("click", event => {
+    call.laserActive = !call.laserActive;
+    event.currentTarget.textContent = call.laserActive ? "🛑 Turn off laser pointer" : "🔴 Laser pointer";
+    setCallStatus(call.laserActive ? "Laser pointer on — touch the video" : "Connected");
+  });
+
+  const laserTarget = screen.querySelector("#remote-video");
+  const sendLaser = event => {
+    if (!call.laserActive || call.dataChannel?.readyState !== "open") return;
+    const rect = laserTarget.getBoundingClientRect();
+    sendLaserPointer(call,
+      Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
+      Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height))
+    );
+  };
+  laserTarget?.addEventListener("pointermove", sendLaser);
+  laserTarget?.addEventListener("pointerdown", sendLaser);
+  laserTarget?.addEventListener("pointerup", () => {
+    if (call.dataChannel?.readyState === "open") call.dataChannel.send(JSON.stringify({ type: "laser-off" }));
   });
 
   screen.querySelector("#call-menu-share-screen")?.addEventListener("click", async event => {
