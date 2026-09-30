@@ -179,9 +179,20 @@ export async function createConversation(otherUserUid) {
 
   const conversationId = [currentUserUid, otherUserUid].sort().join("__");
   const conversationRef = doc(db, "conversations", conversationId);
-  const existing = await getDoc(conversationRef);
 
-  if (existing.exists()) {
+  // Find an existing private chat through the user's allowed conversation query.
+  const existingSnapshot = await getDocs(query(
+    collection(db, "conversations"),
+    where("participants", "array-contains", currentUserUid)
+  ));
+  const existing = existingSnapshot.docs.find(snapshot => {
+    const participants = snapshot.data()?.participants;
+    return Array.isArray(participants)
+      && participants.length === 2
+      && participants.includes(otherUserUid);
+  });
+
+  if (existing) {
     return { id: existing.id, created: false };
   }
 
