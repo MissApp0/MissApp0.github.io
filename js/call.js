@@ -654,6 +654,15 @@ export async function endActiveCall(notify = true) {
 
   call.unsubscribers?.forEach(unsub => unsub());
 
+  // Stop screen sharing immediately when the call ends.
+  if (call.screenTrack) {
+    call.screenTrack.onended = null;
+    call.screenTrack.stop();
+    call.screenTrack = null;
+  }
+  if (call.cameraTrack && !call.stream?.getVideoTracks().includes(call.cameraTrack)) {
+    call.cameraTrack.stop();
+  }
   call.stream?.getTracks().forEach(track => track.stop());
   call.remoteStream?.getTracks().forEach(track => track.stop());
   call.peer?.close();
