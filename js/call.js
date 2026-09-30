@@ -434,6 +434,7 @@ export async function startCall({ calleeId, calleeName, video = false }) {
     stream,
     remoteStream,
     role: "caller",
+    dataChannel,
     unsubscribers: []
   };
 
@@ -465,8 +466,8 @@ async function answerCall(call) {
   const remoteStream = new MediaStream();
   peer.ondatachannel = event => {
     if (event.channel.label !== "missapp-controls") return;
-    activeCall = activeCall || { id: call.id };
-    activeCall.dataChannel = event.channel;
+    peer.__missappDataChannel = event.channel;
+    if (activeCall?.id === call.id) activeCall.dataChannel = event.channel;
     event.channel.onmessage = dataEvent => {
       try {
         const message = JSON.parse(dataEvent.data);
@@ -536,6 +537,7 @@ async function answerCall(call) {
     stream,
     remoteStream,
     role: "callee",
+    dataChannel: peer.__missappDataChannel || null,
     unsubscribers: []
   };
 
