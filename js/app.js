@@ -1,6 +1,6 @@
 import { auth, db } from "./firebase.js";
 import { state } from "./state.js";
-import { playSound, getSoundSettings, updateSoundSettings, resetSoundSettings, unlockAudio, soundTypes, importCustomRingtone, clearCustomRingtone, isDoNotDisturb } from "./sounds.js";
+import { playSound, getSoundSettings, updateSoundSettings, resetSoundSettings, unlockAudio, soundTypes, importCustomRingtone, clearCustomRingtone, previewCustomRingtone, isDoNotDisturb } from "./sounds.js";
 import { initTheme, getTheme, setTheme, themeOptions } from "./themes.js";
 
 import { login } from "./auth/login.js";
@@ -2395,7 +2395,7 @@ function openSettings() {
               ${settingsRow("✉", "Message sent", "Sound after sending.", "sound-messageSent", s.messageSent)}
               ${settingsRow("💬", "Message received", "Sound for incoming messages.", "sound-messageReceived", s.messageReceived)}
               ${settingsRow("☎", "Incoming calls", "Incoming-call alert.", "sound-incomingCall", s.incomingCall)}
-              <div class="settings-row settings-feature-row"><div class="settings-icon">🎵</div><div class="settings-copy"><div class="settings-label">Custom ringtone</div><div class="settings-description">Import an MP3 or MIDI file and use it for incoming calls and call ringing.</div><div id="custom-ringtone-name" class="settings-value">${escapeHTML(s.customRingtone?.name || "Using MissApp default")}</div></div><div class="settings-inline-actions"><label class="settings-file-button" for="custom-ringtone-file">Import</label><input id="custom-ringtone-file" type="file" accept=".mp3,.mid,.midi,audio/mpeg,audio/midi,audio/x-midi" hidden><button id="custom-ringtone-remove" class="settings-reset" type="button" ${s.customRingtone ? "" : "disabled"}>Remove</button></div></div>
+              <div class="settings-row settings-feature-row"><div class="settings-icon">🎵</div><div class="settings-copy"><div class="settings-label">Custom ringtone</div><div class="settings-description">Import an MP3 or MIDI file and use it for incoming calls and call ringing.</div><div id="custom-ringtone-name" class="settings-value">${escapeHTML(s.customRingtone?.name || "Using MissApp default")}</div></div><div class="settings-inline-actions"><label class="settings-file-button" for="custom-ringtone-file">Import</label><input id="custom-ringtone-file" type="file" accept=".mp3,.mid,.midi,audio/mpeg,audio/midi,audio/x-midi" hidden><button id="custom-ringtone-preview" class="settings-reset" type="button" ${s.customRingtone ? "" : "disabled"}>Preview</button><button id="custom-ringtone-remove" class="settings-reset" type="button" ${s.customRingtone ? "" : "disabled"}>Remove</button></div></div>
               ${settingsRow("✓", "Call connected", "Confirmation when connected.", "sound-callConnected", s.callConnected)}
             </div>
             <div class="settings-panel-footer"><button id="settings-reset" class="settings-reset" type="button">Reset sound settings</button></div>
@@ -2498,7 +2498,7 @@ function setupSettingsEvents() {
     }
   });
 
-  modal.querySelector("#custom-ringtone-remove")?.addEventListener("click", async event => {
+  modal.querySelector("#custom-ringtone-preview")?.addEventListener("click", async event => {\n    const played = await previewCustomRingtone();\n    if (!played) showToast("Could not play the custom ringtone.", "error");\n  });\n\n  modal.querySelector("#custom-ringtone-remove")?.addEventListener("click", async event => {
     await clearCustomRingtone();
     modal.querySelector("#custom-ringtone-name").textContent = "Using MissApp default";
     event.currentTarget.disabled = true;
