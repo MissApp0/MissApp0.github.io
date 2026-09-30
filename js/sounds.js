@@ -107,6 +107,7 @@ export async function clearCustomRingtone() {
 }
 
 export function stopCustomRingtone() {
+  pendingSounds = pendingSounds.filter(name => name !== "incomingCall" && name !== "callRinging");
   if (customRingtoneAudio) {
     customRingtoneAudio.pause();
     customRingtoneAudio.currentTime = 0;
