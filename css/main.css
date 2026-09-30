@@ -355,7 +355,8 @@ button, input, textarea, select, .btn {
 .chat-options-button:hover { background: var(--panel-hover); color: var(--text); }
 .chat-options-menu {
   position: absolute; top: calc(100% + 8px); right: 0; z-index: 1200;
-  width: 180px; padding: 6px; border: 1px solid var(--border);
+  width: 210px; max-height: min(520px, calc(100vh - 100px)); overflow-y: auto;
+  padding: 6px; border: 1px solid var(--border);
   border-radius: 13px; background: var(--panel); box-shadow: 0 14px 35px rgba(20,35,42,.18);
 }
 .chat-options-menu button {
