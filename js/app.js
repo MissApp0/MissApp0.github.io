@@ -294,6 +294,13 @@ function createAppUI() {
       <div class="chat-call-actions">
         <button id="voice-call-button" class="chat-call-button" type="button" aria-label="Voice call" title="Voice call">☎</button>
         <button id="video-call-button" class="chat-call-button" type="button" aria-label="Video call" title="Video call">▣</button>
+        <div class="chat-options-wrap">
+          <button id="chat-options-button" class="chat-options-button" type="button" aria-label="Chat options" aria-expanded="false" title="Chat options">⋮</button>
+          <div id="chat-options-menu" class="chat-options-menu hidden" role="menu">
+            <button id="rename-chat-button" type="button" role="menuitem">Rename chat</button>
+            <button id="leave-chat-button" type="button" role="menuitem" class="danger">Leave chat</button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -337,6 +344,9 @@ function setupEvents() {
   document.getElementById("back-button")?.addEventListener("click", handleBack);
   document.getElementById("voice-call-button")?.addEventListener("click", () => beginCall(false));
   document.getElementById("video-call-button")?.addEventListener("click", () => beginCall(true));
+  document.getElementById("chat-options-button")?.addEventListener("click", toggleChatOptions);
+  document.getElementById("rename-chat-button")?.addEventListener("click", renameCurrentChat);
+  document.getElementById("leave-chat-button")?.addEventListener("click", leaveCurrentChat);
 
   const composer = document.getElementById("composer-form");
   const input = document.getElementById("message-input");
@@ -346,6 +356,9 @@ function setupEvents() {
   input?.addEventListener("keydown", handleMessageKeydown);
 
   document.addEventListener("click", event => {
+    const optionsWrap = document.querySelector(".chat-options-wrap");
+    if (optionsWrap && !optionsWrap.contains(event.target)) closeChatOptions();
+
     const container = document.querySelector(".search-container");
 
     if (!container || container.contains(event.target)) {
@@ -1338,6 +1351,97 @@ async function beginCall(video) {
   } catch (error) {
     console.error("Start call error:", error);
     showToast(error?.message || "Could not start the call.", "error");
+  }
+}
+
+
+function toggleChatOptions() {
+  const menu = document.getElementById("chat-options-menu");
+  const button = document.getElementById("chat-options-button");
+  if (!menu || !button || !state.currentConversation) return;
+  const willOpen = menu.classList.contains("hidden");
+  menu.classList.toggle("hidden", !willOpen);
+  button.setAttribute("aria-expanded", String(willOpen));
+}
+
+function closeChatOptions() {
+  document.getElementById("chat-options-menu")?.classList.add("hidden");
+  document.getElementById("chat-options-button")?.setAttribute("aria-expanded", "false");
+}
+
+async function renameCurrentChat() {
+  const conversation = state.currentConversation;
+  closeChatOptions();
+
+  if (!conversation?.isGroup) {
+    showToast("Private chats cannot be renamed.", "info");
+    return;
+  }
+
+  const currentName = conversation.name || "Group";
+  const name = window.prompt("Enter a new chat name:", currentName)?.trim();
+  if (!name || name === currentName) return;
+
+  try {
+    const nextName = name.slice(0, 60);
+    await updateDoc(doc(db, "conversations", conversation.id), {
+      name: nextName,
+      updatedAt: serverTimestamp()
+    });
+    state.currentConversation.name = nextName;
+    updateChatHeader(conversation.otherUser || {}, {
+      type: "group",
+      name: nextName,
+      participants: conversation.participants
+    });
+    showToast("Chat renamed.", "success");
+  } catch (error) {
+    console.error("Rename chat error:", error);
+    showToast(getFirestoreError(error), "error");
+  }
+}
+
+async function leaveCurrentChat() {
+  const conversation = state.currentConversation;
+  if (!conversation || !state.user?.uid) return;
+  closeChatOptions();
+
+  const confirmed = window.confirm(
+    conversation.isGroup
+      ? "Leave this group chat? You will no longer receive messages from it."
+      : "Leave this chat? You will no longer receive messages from it."
+  );
+  if (!confirmed) return;
+
+  try {
+    const remainingParticipants = conversation.participants.filter(uid => uid !== state.user.uid);
+    if (remainingParticipants.length === conversation.participants.length) {
+      throw new Error("You are not a participant in this chat.");
+    }
+
+    await updateDoc(doc(db, "conversations", conversation.id), {
+      participants: remainingParticipants,
+      updatedAt: serverTimestamp()
+    });
+
+    unsubscribeMessages?.();
+    unsubscribeMessages = null;
+    typingUnsubscribe?.();
+    typingUnsubscribe = null;
+    currentConversationId = null;
+    state.currentConversation = null;
+    disableComposer();
+    document.getElementById("voice-call-button")?.setAttribute("disabled", "");
+    document.getElementById("video-call-button")?.setAttribute("disabled", "");
+    document.getElementById("chat-name").textContent = "Select a conversation";
+    document.getElementById("chat-status").textContent = "Choose someone to start chatting";
+    document.getElementById("chat-avatar").textContent = "?";
+    document.getElementById("messages").innerHTML = '<div class="chat-empty"><div><div class="chat-empty-title">Welcome to MissApp</div><div>Select a conversation to start messaging.</div></div></div>';
+    document.body.classList.remove("chat-open");
+    showToast("You left the chat.", "success");
+  } catch (error) {
+    console.error("Leave chat error:", error);
+    showToast(getFirestoreError(error), "error");
   }
 }
 
