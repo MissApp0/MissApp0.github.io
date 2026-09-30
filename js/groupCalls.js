@@ -398,6 +398,45 @@ function attachRemote(uid, stream, data) {
   tile.querySelector("video").srcObject = stream;
 }
 
+async function replaceGroupVideoTrack(call, newTrack) {
+  const old = call.stream.getVideoTracks()[0];
+  for (const peer of call.peers.values()) {
+    const sender = peer.getSenders().find(item => item.track?.kind === "video");
+    if (sender) await sender.replaceTrack(newTrack);
+  }
+  if (old && old !== newTrack) old.stop();
+  if (old) call.stream.removeTrack(old);
+  call.stream.addTrack(newTrack);
+  const local = document.querySelector("#group-active-call .local");
+  if (local) local.srcObject = call.stream;
+}
+async function switchGroupCamera() {
+  const call = active;
+  if (!call?.stream?.getVideoTracks().length) return;
+  const cameras = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
+  if (cameras.length < 2) return;
+  const current = call.stream.getVideoTracks()[0].getSettings?.().deviceId;
+  const next = cameras.find(d => d.deviceId !== current) || cameras[0];
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { deviceId: { exact: next.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } });
+  await replaceGroupVideoTrack(call, stream.getVideoTracks()[0]);
+}
+async function toggleGroupScreenShare() {
+  const call = active;
+  if (!call || !navigator.mediaDevices?.getDisplayMedia) return;
+  if (call.screenTrack) {
+    await replaceGroupVideoTrack(call, call.cameraTrack);
+    call.screenTrack.stop();
+    call.screenTrack = null;
+    return;
+  }
+  const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+  const screenTrack = display.getVideoTracks()[0];
+  call.cameraTrack = call.stream.getVideoTracks()[0];
+  call.screenTrack = screenTrack;
+  await replaceGroupVideoTrack(call, screenTrack);
+  screenTrack.onended = () => { if (active?.id === call.id) toggleGroupScreenShare().catch(() => {}); };
+}
+
 function showScreen(call) {
   document.getElementById("group-active-call")?.remove();
   const screen = document.createElement("div");
@@ -410,7 +449,7 @@ function showScreen(call) {
     </div>
     <div class="group-call-controls">
       <button id="group-mic" class="call-control" title="Mute microphone">🎙</button>
-      ${call.type === "video" ? '<button id="group-camera" class="call-control" title="Camera">📹</button>' : ""}
+      ${call.type === "video" ? '<button id="group-camera" class="call-control" title="Camera">📹</button><button id="group-switch-camera" class="call-control" title="Switch camera">🔄</button><button id="group-share-screen" class="call-control" title="Share screen">🖥</button>' : ""}
       <button id="group-end" class="call-control end" title="End call">☎</button>
     </div>`;
   screen.querySelector("strong").textContent = call.groupName || "Group call";
@@ -423,6 +462,8 @@ function showScreen(call) {
     track.enabled = !track.enabled;
     event.currentTarget.classList.toggle("off", !track.enabled);
   };
+  screen.querySelector("#group-switch-camera")?.addEventListener("click", () => switchGroupCamera().catch(error => console.error("Group camera switch error:", error)));
+  screen.querySelector("#group-share-screen")?.addEventListener("click", () => toggleGroupScreenShare().catch(error => console.error("Group screen share error:", error)));
   screen.querySelector("#group-camera")?.addEventListener("click", event => {
     const track = call.stream.getVideoTracks()[0];
     if (!track) return;
