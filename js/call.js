@@ -62,6 +62,7 @@ let pendingCallResources = null;
 let incomingUnsubscribe = null;
 let callTimeout = null;
 let ringingTimer = null;
+let incomingCallId = null;
 
 function startOutgoingRinging() {
   stopOutgoingRinging();
@@ -308,8 +309,10 @@ function listenForIncomingCalls() {
       if (
         call.callee === auth.currentUser?.uid &&
         call.status === "ringing" &&
-        !activeCall
+        !activeCall &&
+        incomingCallId !== call.id
       ) {
+        incomingCallId = call.id;
         playSound("incomingCall");
         showIncomingCall(call);
       }
@@ -404,7 +407,7 @@ export async function startCall({ calleeId, calleeName, video = false }) {
     stream,
     remoteStream,
     role: "caller",
-    dataChannel,
+    dataChannel: null,
     unsubscribers: []
   };
   pendingCallResources = null;
@@ -420,6 +423,10 @@ export async function startCall({ calleeId, calleeName, video = false }) {
 
 async function answerCall(call) {
   if (!auth.currentUser || activeCall) return;
+
+  stopCustomRingtone();
+  stopOutgoingRinging();
+  incomingCallId = null;
 
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error("Camera and microphone are not available in this browser.");
@@ -569,6 +576,9 @@ function listenForCallerCandidates(callId, peer) {
 }
 
 export async function declineCall(callId) {
+  incomingCallId = null;
+  stopCustomRingtone();
+  stopOutgoingRinging();
   try {
     await updateDoc(doc(db, "calls", callId), {
       status: "declined",
@@ -589,6 +599,7 @@ export async function endActiveCall(notify = true) {
       pendingCallResources.peer?.close();
       pendingCallResources = null;
     }
+    stopCustomRingtone();
     stopOutgoingRinging();
     hideCallScreen();
     return;
@@ -596,6 +607,7 @@ export async function endActiveCall(notify = true) {
 
   activeCall = null;
   clearCallTimeout();
+  stopCustomRingtone();
   stopOutgoingRinging();
 
   // Release microphone, camera, screen share, and WebRTC immediately.
@@ -674,6 +686,9 @@ function showIncomingCall(call) {
 
   modal.querySelector("#decline-call").addEventListener("click", () => { stopCustomRingtone(); declineCall(call.id); });
   modal.querySelector("#accept-call").addEventListener("click", async () => {
+    incomingCallId = null;
+    stopCustomRingtone();
+    stopOutgoingRinging();
     modal.remove();
     try {
       await answerCall(call);
