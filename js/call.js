@@ -103,6 +103,8 @@ async function toggleScreenShare() {
     if (camera) await sender.replaceTrack(camera);
     call.screenTrack.stop();
     call.screenTrack = null;
+    const local = document.getElementById("local-video");
+    if (local) local.srcObject = call.stream;
     return;
   }
   const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
@@ -110,6 +112,11 @@ async function toggleScreenShare() {
   call.cameraTrack = call.stream.getVideoTracks()[0];
   call.screenTrack = screenTrack;
   await sender.replaceTrack(screenTrack);
+  const local = document.getElementById("local-video");
+  if (local) {
+    const preview = new MediaStream([...call.stream.getAudioTracks(), screenTrack]);
+    local.srcObject = preview;
+  }
   screenTrack.onended = () => { if (activeCall?.id === call.id) toggleScreenShare().catch(() => {}); };
 }
 function clearCallTimeout() {
