@@ -7,10 +7,12 @@ import {
   serverTimestamp, query, where, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { turnConfig } from "./config.js";
-import { playSound } from "./sounds.js";
+import { playSound, stopCustomRingtone } from "./sounds.js";
 
 let incomingUnsubscribe = null;
 let active = null;
+let incomingGroupCallId = null;
+let groupRingingTimer = null;
 
 const stunServers = [
   { urls: "stun:stun.l.google.com:19302" },
@@ -57,8 +59,10 @@ export function initGroupCalls() {
           call.status === "ringing" &&
           Array.isArray(call.participants) &&
           call.participants.includes(uid) &&
-          !active
+          !active &&
+          incomingGroupCallId !== call.id
         ) {
+          incomingGroupCallId = call.id;
           playSound("incomingCall");
           showIncoming(call);
         }
@@ -126,6 +130,7 @@ export async function startGroupCall({ participantIds, participantData = {}, gro
     });
     active.unsubscribers.push(stateUnsub);
     showScreen(active);
+    startGroupRinging();
     await setupGroupMesh();
     return active;
   } catch (error) {
@@ -345,6 +350,10 @@ async function waitForGroupOffer(callId, uid, attempts = 20, delayMs = 500) {
 async function answerGroupCall(call) {
   if (active || !auth.currentUser) return;
 
+  stopCustomRingtone();
+  stopGroupRinging();
+  incomingGroupCallId = null;
+
   const stream = await media(call.type === "video");
 
   active = {
@@ -371,6 +380,20 @@ async function answerGroupCall(call) {
     console.error("Group call mesh setup error:", error);
   }
 }
+function startGroupRinging() {
+  stopGroupRinging();
+  playSound("callRinging");
+  groupRingingTimer = setInterval(() => playSound("callRinging"), 2500);
+}
+
+function stopGroupRinging() {
+  if (groupRingingTimer) {
+    clearInterval(groupRingingTimer);
+    groupRingingTimer = null;
+  }
+  stopCustomRingtone();
+}
+
 async function flushCandidates(callId, routeId, peer) {
   const snapshot = await getDocs(collection(db, "groupCalls", callId, "candidates", routeId, "items"));
   for (const item of snapshot.docs) {
@@ -488,12 +511,18 @@ function showIncoming(call) {
   document.body.appendChild(modal);
   modal.querySelector("#group-decline").onclick = () => declineGroup(call.id);
   modal.querySelector("#group-accept").onclick = async () => {
+    stopCustomRingtone();
+    stopGroupRinging();
+    incomingGroupCallId = null;
     try { await answerGroupCall(call); }
     catch (error) { console.error(error); alert(error.message || "Could not join the group call."); await declineGroup(call.id); }
   };
 }
 
 async function declineGroup(callId) {
+  incomingGroupCallId = null;
+  stopCustomRingtone();
+  stopGroupRinging();
   try {
     await setDoc(doc(db, "groupCalls", callId, "declinedBy", auth.currentUser.uid), {
       at: serverTimestamp()
@@ -504,6 +533,8 @@ async function declineGroup(callId) {
 
 export async function endGroupCall(notify = true) {
   const call = active;
+  stopCustomRingtone();
+  stopGroupRinging();
   if (!call) return;
   active = null;
   if (notify) {
