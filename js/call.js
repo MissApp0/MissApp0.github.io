@@ -584,6 +584,25 @@ export async function endActiveCall(notify = true) {
   clearCallTimeout();
   stopOutgoingRinging();
 
+  // Release microphone, camera, screen share, and WebRTC immediately.
+  // Do this before any Firestore/network work so browser permissions stop at once.
+  call.unsubscribers?.forEach(unsub => unsub());
+  call.unsubscribers = [];
+
+  if (call.screenTrack) {
+    call.screenTrack.onended = null;
+    call.screenTrack.stop();
+    call.screenTrack = null;
+  }
+  if (call.cameraTrack && !call.stream?.getVideoTracks().includes(call.cameraTrack)) {
+    call.cameraTrack.stop();
+  }
+  call.stream?.getTracks().forEach(track => track.stop());
+  call.remoteStream?.getTracks().forEach(track => track.stop());
+  call.peer?.close();
+
+  hideCallScreen();
+
   if (notify) {
     try {
       await updateDoc(doc(db, "calls", call.id), {
@@ -607,22 +626,6 @@ export async function endActiveCall(notify = true) {
     console.debug("Call history cleanup failed:", error);
   }
 
-  call.unsubscribers?.forEach(unsub => unsub());
-
-  // Stop screen sharing immediately when the call ends.
-  if (call.screenTrack) {
-    call.screenTrack.onended = null;
-    call.screenTrack.stop();
-    call.screenTrack = null;
-  }
-  if (call.cameraTrack && !call.stream?.getVideoTracks().includes(call.cameraTrack)) {
-    call.cameraTrack.stop();
-  }
-  call.stream?.getTracks().forEach(track => track.stop());
-  call.remoteStream?.getTracks().forEach(track => track.stop());
-  call.peer?.close();
-
-  hideCallScreen();
 }
 
 function showIncomingCall(call) {
