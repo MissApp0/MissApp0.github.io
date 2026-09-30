@@ -1,6 +1,6 @@
 import { auth, db } from "./firebase.js";
 import { turnConfig } from "./config.js";
-import { playSound, isDoNotDisturb } from "./sounds.js";
+import { playSound, stopCustomRingtone, isDoNotDisturb } from "./sounds.js";
 import {
   addDoc,
   collection,
@@ -655,7 +655,7 @@ function showIncomingCall(call) {
 
   document.body.appendChild(modal);
 
-  modal.querySelector("#decline-call").addEventListener("click", () => declineCall(call.id));
+  modal.querySelector("#decline-call").addEventListener("click", () => { stopCustomRingtone(); declineCall(call.id); });
   modal.querySelector("#accept-call").addEventListener("click", async () => {
     modal.remove();
     try {
