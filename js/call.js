@@ -58,6 +58,7 @@ const OFFER_WAIT_ATTEMPTS = 20;
 const OFFER_WAIT_DELAY_MS = 500;
 
 let activeCall = null;
+let pendingCallResources = null;
 let incomingUnsubscribe = null;
 let callTimeout = null;
 let ringingTimer = null;
@@ -361,6 +362,7 @@ export async function startCall({ calleeId, calleeName, video = false }) {
   }
 
   const peer = new RTCPeerConnection(rtcConfig);
+  pendingCallResources = { stream, peer };
   stream.getTracks().forEach(track => peer.addTrack(track, stream));
 
   const callRef = doc(collection(db, "calls"));
@@ -405,6 +407,7 @@ export async function startCall({ calleeId, calleeName, video = false }) {
     dataChannel,
     unsubscribers: []
   };
+  pendingCallResources = null;
 
   listenForAnswer(callRef.id, peer);
   listenForCalleeCandidates(callRef.id, peer);
@@ -578,7 +581,18 @@ export async function declineCall(callId) {
 
 export async function endActiveCall(notify = true) {
   const call = activeCall;
-  if (!call) return;
+  if (!call) {
+    // The caller can cancel while startCall is still creating the offer.
+    // Release the media acquired before activeCall is assigned.
+    if (pendingCallResources) {
+      pendingCallResources.stream?.getTracks().forEach(track => track.stop());
+      pendingCallResources.peer?.close();
+      pendingCallResources = null;
+    }
+    stopOutgoingRinging();
+    hideCallScreen();
+    return;
+  }
 
   activeCall = null;
   clearCallTimeout();
