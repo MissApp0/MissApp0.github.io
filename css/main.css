@@ -443,3 +443,39 @@ button, input, textarea, select, .btn {
 .call-options-menu.hidden {
   display: none !important;
 }
+
+
+/* Mobile call laser pointer */
+.remote-laser-pointer {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 50%;
+  background: #ff3030;
+  box-shadow: 0 0 0 5px rgba(255, 48, 48, .22), 0 0 18px rgba(255, 48, 48, .9);
+  pointer-events: none;
+  z-index: 15;
+  transform: translate(-50%, -50%);
+}
+
+#remote-video {
+  touch-action: none;
+}
+
+@media (max-width: 700px) {
+  .call-options-menu {
+    min-width: 210px;
+    padding: 8px;
+  }
+
+  .call-options-menu button {
+    min-height: 46px;
+    font-size: 15px;
+  }
+
+  .remote-laser-pointer {
+    width: 20px;
+    height: 20px;
+  }
+}
