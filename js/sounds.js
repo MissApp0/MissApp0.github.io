@@ -121,14 +121,23 @@ export function stopCustomRingtone() {
 
 function playMp3Ringtone() {
   if (!customRingtoneBuffer) return false;
-  if (customRingtoneUrl) URL.revokeObjectURL(customRingtoneUrl);
+  stopCustomRingtone();
   const blob = new Blob([customRingtoneBuffer], { type: "audio/mpeg" });
   customRingtoneUrl = URL.createObjectURL(blob);
   const audio = new Audio(customRingtoneUrl);
+  customRingtoneAudio = audio;
   audio.volume = settings.volume;
-  audio.loop = false;
-  audio.play().catch(() => {});
-  audio.addEventListener("ended", () => URL.revokeObjectURL(customRingtoneUrl), { once: true });
+  audio.loop = true;
+  audio.addEventListener("ended", () => {
+    if (customRingtoneAudio === audio) customRingtoneAudio = null;
+    if (customRingtoneUrl) {
+      URL.revokeObjectURL(customRingtoneUrl);
+      customRingtoneUrl = null;
+    }
+  }, { once: true });
+  audio.play().catch(() => {
+    if (customRingtoneAudio === audio) customRingtoneAudio = null;
+  });
   return true;
 }
 
@@ -172,6 +181,7 @@ function readMidiEvents(buffer) {
 }
 
 function playMidiRingtone() {
+  stopCustomRingtone();
   const ctx = getAudioContext();
   if (!ctx || ctx.state !== "running" || !customRingtoneBuffer) return false;
   try {
@@ -188,6 +198,10 @@ function playMidiRingtone() {
       gain.gain.setValueAtTime(event.on ? Math.max(.01, settings.volume * .16) : .0001, time);
       gain.gain.exponentialRampToValueAtTime(.0001, time + duration);
       osc.connect(gain).connect(ctx.destination);
+      customRingtoneOscillators.push({ osc, gain });
+      osc.addEventListener?.("ended", () => {
+        customRingtoneOscillators = customRingtoneOscillators.filter(item => item.osc !== osc);
+      });
       osc.start(time);
       osc.stop(time + duration + .03);
     });
