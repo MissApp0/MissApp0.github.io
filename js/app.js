@@ -1802,9 +1802,11 @@ function renderMessages(messages) {
         `;
       }
 
+      const senderName = message.senderName || message.sender || "User";
       return `
         <div class="message-row ${mine ? "mine" : "theirs"}">
           <div class="message">
+            ${!mine ? `<div class="message-sender">${escapeHTML(senderName)}</div>` : ""}
             <div class="message-text">${escapeHTML(message.text || "")}</div>
             ${time ? `<div class="message-time">${escapeHTML(time)}</div>` : ""}
           </div>
