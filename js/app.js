@@ -244,7 +244,8 @@ function createAppUI() {
 
         <div class="current-user-info">
           <div id="current-user-name" class="current-user-name">User</div>
-          <div id="current-user-email" class="current-user-email">Loading...</div>\n          <div id="current-user-status" class="current-user-status"><span class="status-dot"></span><span>Available</span></div>
+          <div id="current-user-email" class="current-user-email">Loading...</div>
+          <div id="current-user-status" class="current-user-status"><span class="status-dot"></span><span>Available</span></div>
         </div>
       </div>
 
@@ -745,7 +746,16 @@ async function loadCurrentUser(user) {
   updateCurrentUserUI();
 }
 
-function updateDoNotDisturbUI() {\n  const active = isDoNotDisturb();\n  const status = document.getElementById("current-user-status");\n  if (status) {\n    status.classList.toggle("dnd", active);\n    status.innerHTML = `<span class="status-dot"></span><span>${active ? "Do Not Disturb" : "Available"}</span>`;\n  }\n}\n\nfunction updateCurrentUserUI() {
+function updateDoNotDisturbUI() {
+  const active = isDoNotDisturb();
+  const status = document.getElementById("current-user-status");
+  if (status) {
+    status.classList.toggle("dnd", active);
+    status.innerHTML = `<span class="status-dot"></span><span>${active ? "Do Not Disturb" : "Available"}</span>`;
+  }
+}
+
+function updateCurrentUserUI() {
   const user = state.me;
 
   if (!user) return;
@@ -1514,7 +1524,9 @@ function showChatInfo() {
   if (!conversation) return;
   const count = conversation.participants?.length || 0;
   const name = conversation.isGroup ? (conversation.name || "Group") : (conversation.otherUser?.displayName || conversation.otherUser?.username || conversation.otherUser?.email || "User");
-  window.alert(`${name}\n\n${conversation.isGroup ? `Group chat • ${count} participants` : "Private chat"}`);
+  window.alert(`${name}
+
+${conversation.isGroup ? `Group chat • ${count} participants` : "Private chat"}`);
 }
 
 function togglePinChat() {
@@ -1551,7 +1563,9 @@ function exportCurrentChat() {
   closeChatOptions();
   const lines = [...document.querySelectorAll("#messages .message-row")].map(row => row.innerText.trim()).filter(Boolean);
   const name = (conversation.name || conversation.otherUser?.displayName || conversation.otherUser?.username || "chat").replace(/[^a-z0-9_-]+/gi, "-");
-  const blob = new Blob([lines.join("\n\n")], { type: "text/plain;charset=utf-8" });
+  const blob = new Blob([lines.join("
+
+")], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -2367,7 +2381,8 @@ function openSettings() {
           <section class="settings-tab-panel active" data-settings-panel="general">
             <div class="settings-panel-intro"><div class="settings-panel-title">General</div><div class="settings-panel-description">A few essentials for how MissApp behaves.</div></div>
             <div class="settings-panel-card">
-              ${settingsRow("🟢", "Do Not Disturb", "Silence message, status, and incoming-call sounds while keeping your chats available.", "do-not-disturb", getSoundSettings().doNotDisturb)}\n              <div class="settings-row"><div class="settings-icon">🌐</div><div class="settings-copy"><div class="settings-label">Language</div><div class="settings-description">Interface language</div></div><select class="settings-select" disabled><option>English</option></select></div>
+              ${settingsRow("🟢", "Do Not Disturb", "Silence message, status, and incoming-call sounds while keeping your chats available.", "do-not-disturb", getSoundSettings().doNotDisturb)}
+              <div class="settings-row"><div class="settings-icon">🌐</div><div class="settings-copy"><div class="settings-label">Language</div><div class="settings-description">Interface language</div></div><select class="settings-select" disabled><option>English</option></select></div>
               <div class="settings-row"><div class="settings-icon">↻</div><div class="settings-copy"><div class="settings-label">Hard refresh</div><div class="settings-description">Clear cached app resources and reload MissApp.</div></div><button id="settings-hard-refresh" class="settings-reset" type="button">Refresh</button></div>
             </div>
           </section>
@@ -2381,7 +2396,8 @@ function openSettings() {
               <div class="settings-row"><div class="settings-icon">🎵</div><div class="settings-copy"><div class="settings-label">Sound type</div><div class="settings-description">Choose the style of MissApp notifications.</div></div><select id="sound-type" class="settings-select" aria-label="Sound type">${Object.entries(soundTypes).map(([id,type]) => '<option value="' + escapeHTML(id) + '" ' + (s.soundType === id ? 'selected' : '') + '>' + escapeHTML(type.name) + '</option>').join('')}</select></div>
               ${settingsRow("✉", "Message sent", "Sound after sending.", "sound-messageSent", s.messageSent)}
               ${settingsRow("💬", "Message received", "Sound for incoming messages.", "sound-messageReceived", s.messageReceived)}
-              ${settingsRow("☎", "Incoming calls", "Incoming-call alert.", "sound-incomingCall", s.incomingCall)}\n              <div class="settings-row settings-feature-row"><div class="settings-icon">🎵</div><div class="settings-copy"><div class="settings-label">Custom ringtone</div><div class="settings-description">Import an MP3 or MIDI file and use it for incoming calls and call ringing.</div><div id="custom-ringtone-name" class="settings-value">${escapeHTML(s.customRingtone?.name || "Using MissApp default")}</div></div><div class="settings-inline-actions"><label class="settings-file-button" for="custom-ringtone-file">Import</label><input id="custom-ringtone-file" type="file" accept=".mp3,.mid,.midi,audio/mpeg,audio/midi,audio/x-midi" hidden><button id="custom-ringtone-remove" class="settings-reset" type="button" ${s.customRingtone ? "" : "disabled"}>Remove</button></div></div>
+              ${settingsRow("☎", "Incoming calls", "Incoming-call alert.", "sound-incomingCall", s.incomingCall)}
+              <div class="settings-row settings-feature-row"><div class="settings-icon">🎵</div><div class="settings-copy"><div class="settings-label">Custom ringtone</div><div class="settings-description">Import an MP3 or MIDI file and use it for incoming calls and call ringing.</div><div id="custom-ringtone-name" class="settings-value">${escapeHTML(s.customRingtone?.name || "Using MissApp default")}</div></div><div class="settings-inline-actions"><label class="settings-file-button" for="custom-ringtone-file">Import</label><input id="custom-ringtone-file" type="file" accept=".mp3,.mid,.midi,audio/mpeg,audio/midi,audio/x-midi" hidden><button id="custom-ringtone-remove" class="settings-reset" type="button" ${s.customRingtone ? "" : "disabled"}>Remove</button></div></div>
               ${settingsRow("✓", "Call connected", "Confirmation when connected.", "sound-callConnected", s.callConnected)}
             </div>
             <div class="settings-panel-footer"><button id="settings-reset" class="settings-reset" type="button">Reset sound settings</button></div>
@@ -2456,7 +2472,42 @@ function setupSettingsEvents() {
     });
   });
 
-  modal.querySelector("#do-not-disturb")?.addEventListener("click", event => {\n    const next = !getSoundSettings().doNotDisturb;\n    updateSoundSettings({ doNotDisturb: next });\n    event.currentTarget.classList.toggle("active", next);\n    event.currentTarget.setAttribute("aria-checked", String(next));\n    updateDoNotDisturbUI();\n    showToast(next ? "Do Not Disturb is on. Notifications are quiet." : "Do Not Disturb is off.", "info");\n  });\n\n  modal.querySelector("#custom-ringtone-file")?.addEventListener("change", async event => {\n    const file = event.target.files?.[0];\n    if (!file) return;\n    try {\n      const ringtone = await importCustomRingtone(file);\n      const label = modal.querySelector("#custom-ringtone-name");\n      if (label) label.textContent = ringtone.name;\n      const remove = modal.querySelector("#custom-ringtone-remove");\n      if (remove) remove.disabled = false;\n      await unlockAudio();\n      playSound("incomingCall");\n      showToast("Custom ringtone imported.", "success");\n    } catch (error) {\n      showToast(error.message || "Could not import that ringtone.", "error");\n    } finally {\n      event.target.value = "";\n    }\n  });\n\n  modal.querySelector("#custom-ringtone-remove")?.addEventListener("click", async event => {\n    await clearCustomRingtone();\n    modal.querySelector("#custom-ringtone-name").textContent = "Using MissApp default";\n    event.currentTarget.disabled = true;\n    showToast("Custom ringtone removed.", "info");\n  });\n\n  modal.querySelector("#settings-test-sound")?.addEventListener("click", async () => {
+  modal.querySelector("#do-not-disturb")?.addEventListener("click", event => {
+    const next = !getSoundSettings().doNotDisturb;
+    updateSoundSettings({ doNotDisturb: next });
+    event.currentTarget.classList.toggle("active", next);
+    event.currentTarget.setAttribute("aria-checked", String(next));
+    updateDoNotDisturbUI();
+    showToast(next ? "Do Not Disturb is on. Notifications are quiet." : "Do Not Disturb is off.", "info");
+  });
+
+  modal.querySelector("#custom-ringtone-file")?.addEventListener("change", async event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const ringtone = await importCustomRingtone(file);
+      const label = modal.querySelector("#custom-ringtone-name");
+      if (label) label.textContent = ringtone.name;
+      const remove = modal.querySelector("#custom-ringtone-remove");
+      if (remove) remove.disabled = false;
+      await unlockAudio();
+      playSound("incomingCall");
+      showToast("Custom ringtone imported.", "success");
+    } catch (error) {
+      showToast(error.message || "Could not import that ringtone.", "error");
+    } finally {
+      event.target.value = "";
+    }
+  });
+
+  modal.querySelector("#custom-ringtone-remove")?.addEventListener("click", async event => {
+    await clearCustomRingtone();
+    modal.querySelector("#custom-ringtone-name").textContent = "Using MissApp default";
+    event.currentTarget.disabled = true;
+    showToast("Custom ringtone removed.", "info");
+  });
+
+  modal.querySelector("#settings-test-sound")?.addEventListener("click", async () => {
     await unlockAudio();
     playSound("messageReceived");
   });
