@@ -148,24 +148,6 @@ async function toggleScreenShare() {
   }
 }
 
-function showLaserPointer(call, x, y) {
-  const screen = document.getElementById("active-call");
-  if (!screen) return;
-  let pointer = screen.querySelector(".remote-laser-pointer");
-  if (!pointer) {
-    pointer = document.createElement("div");
-    pointer.className = "remote-laser-pointer";
-    screen.appendChild(pointer);
-  }
-  pointer.style.left = (x * 100) + "%";
-  pointer.style.top = (y * 100) + "%";
-}
-
-function sendLaserPointer(call, x, y) {
-  if (call?.dataChannel?.readyState === "open") {
-    call.dataChannel.send(JSON.stringify({ type: "laser", x, y }));
-  }
-}
 function clearCallTimeout() {
   if (callTimeout) {
     clearTimeout(callTimeout);
@@ -398,20 +380,6 @@ export async function startCall({ calleeId, calleeName, video = false }) {
   attachPeerMonitoring(peer, call);
 
   const remoteStream = new MediaStream();
-  const dataChannel = peer.createDataChannel("missapp-controls");
-  dataChannel.onmessage = event => {
-    try {
-      const message = JSON.parse(event.data);
-      if (message.type === "laser") showLaserPointer(activeCall, message.x, message.y);
-      if (message.type === "laser-off") document.getElementById("active-call")?.querySelector(".remote-laser-pointer")?.remove();
-    } catch {}
-  };
-
-  peer.ondatachannel = event => {
-    if (event.channel.label !== "missapp-controls") return;
-    event.channel.onmessage = dataChannel.onmessage;
-  };
-
   peer.ontrack = event => {
     event.streams[0]?.getTracks().forEach(track => remoteStream.addTrack(track));
     attachRemoteStream(remoteStream);
@@ -464,19 +432,6 @@ async function answerCall(call) {
   stream.getTracks().forEach(track => peer.addTrack(track, stream));
 
   const remoteStream = new MediaStream();
-  peer.ondatachannel = event => {
-    if (event.channel.label !== "missapp-controls") return;
-    peer.__missappDataChannel = event.channel;
-    if (activeCall?.id === call.id) activeCall.dataChannel = event.channel;
-    event.channel.onmessage = dataEvent => {
-      try {
-        const message = JSON.parse(dataEvent.data);
-        if (message.type === "laser") showLaserPointer(activeCall, message.x, message.y);
-        if (message.type === "laser-off") document.getElementById("active-call")?.querySelector(".remote-laser-pointer")?.remove();
-      } catch {}
-    };
-  };
-
   peer.ontrack = event => {
     event.streams[0]?.getTracks().forEach(track => remoteStream.addTrack(track));
     attachRemoteStream(remoteStream);
@@ -736,7 +691,7 @@ function showCallScreen(call) {
         <button id="call-options-button" class="call-control call-options-button" type="button" title="Call options" aria-label="Call options" aria-expanded="false">⋮</button>
         <div id="call-options-menu" class="call-options-menu hidden" role="menu">
           <button id="call-menu-mic" type="button" role="menuitem">🎙 Mute microphone</button>
-          ${call.type === "video" ? '<button id="call-menu-camera" type="button" role="menuitem">📹 Camera</button><button id="call-menu-switch-camera" type="button" role="menuitem">🔄 Switch camera</button><button id="call-menu-share-screen" type="button" role="menuitem">🖥 Share screen</button><button id="call-menu-laser" type="button" role="menuitem">🔴 Laser pointer</button>' : ""}
+          ${call.type === "video" ? '<button id="call-menu-camera" type="button" role="menuitem">📹 Camera</button><button id="call-menu-switch-camera" type="button" role="menuitem">🔄 Switch camera</button><button id="call-menu-share-screen" type="button" role="menuitem">🖥 Share screen</button>' : ""}
         </div>
       </div>
     </div>
@@ -778,26 +733,6 @@ function showCallScreen(call) {
     try { await switchCamera(); } catch (error) { console.error("Switch camera error:", error); setCallStatus("Could not switch camera."); }
   });
 
-  screen.querySelector("#call-menu-laser")?.addEventListener("click", event => {
-    call.laserActive = !call.laserActive;
-    event.currentTarget.textContent = call.laserActive ? "🛑 Turn off laser pointer" : "🔴 Laser pointer";
-    setCallStatus(call.laserActive ? "Laser pointer on — touch the video" : "Connected");
-  });
-
-  const laserTarget = screen.querySelector("#remote-video");
-  const sendLaser = event => {
-    if (!call.laserActive || call.dataChannel?.readyState !== "open") return;
-    const rect = laserTarget.getBoundingClientRect();
-    sendLaserPointer(call,
-      Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
-      Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height))
-    );
-  };
-  laserTarget?.addEventListener("pointermove", sendLaser);
-  laserTarget?.addEventListener("pointerdown", sendLaser);
-  laserTarget?.addEventListener("pointerup", () => {
-    if (call.dataChannel?.readyState === "open") call.dataChannel.send(JSON.stringify({ type: "laser-off" }));
-  });
 
   screen.querySelector("#call-menu-share-screen")?.addEventListener("click", async event => {
     try {
