@@ -1563,9 +1563,7 @@ function exportCurrentChat() {
   closeChatOptions();
   const lines = [...document.querySelectorAll("#messages .message-row")].map(row => row.innerText.trim()).filter(Boolean);
   const name = (conversation.name || conversation.otherUser?.displayName || conversation.otherUser?.username || "chat").replace(/[^a-z0-9_-]+/gi, "-");
-  const blob = new Blob([lines.join("
-
-")], { type: "text/plain;charset=utf-8" });
+  const blob = new Blob([lines.join("\n\n")], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
