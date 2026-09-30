@@ -397,3 +397,49 @@ button, input, textarea, select, .btn {
 @keyframes introFade{from{opacity:0}to{opacity:1}}
 @keyframes introSlide{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @media(max-width:600px){.intro-overlay{padding:12px}.intro-card{min-height:calc(100vh - 24px);padding:24px;border-radius:22px}.intro-slide h1{font-size:34px}.intro-hero-icon{width:72px;height:72px;margin-bottom:20px}.intro-feature-grid{gap:8px}}
+
+
+/* Call three-dot options menu */
+.call-options-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.call-options-button {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.call-options-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  min-width: 190px;
+  padding: 6px;
+  border-radius: 12px;
+  background: rgba(20, 27, 31, .97);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, .28);
+  z-index: 20;
+}
+
+.call-options-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.call-options-menu button:hover,
+.call-options-menu button:focus-visible {
+  background: rgba(255, 255, 255, .12);
+}
+
+.call-options-menu.hidden {
+  display: none !important;
+}
