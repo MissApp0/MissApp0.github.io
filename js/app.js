@@ -507,6 +507,7 @@ function setupAuth() {
       showApp();
       await ensureUserDocument(user);
       await loadCurrentUser(user);
+      maybeShowIntro();
       startConversationListener();
       startIncomingMessageListener();
       setupBrowserNotifications();
@@ -525,6 +526,114 @@ function setupAuth() {
     showAuth();
     showAuthError(getAuthError(error));
   });
+}
+
+
+function maybeShowIntro() {
+  if (localStorage.getItem("missapp-intro-complete") === "1") return;
+  const existing = document.getElementById("missapp-intro");
+  if (existing) return;
+
+  const overlay = document.createElement("div");
+  overlay.id = "missapp-intro";
+  overlay.className = "intro-overlay";
+  overlay.innerHTML = `
+    <div class="intro-card">
+      <div class="intro-brand"><span class="intro-logo">M</span><span>MissApp</span></div>
+      <div class="intro-slides">
+        <section class="intro-slide active" data-slide="0">
+          <div class="intro-hero-icon">✦</div>
+          <div class="intro-kicker">WELCOME TO MISSAPP</div>
+          <h1>Stay close.<br><strong>Keep it simple.</strong></h1>
+          <p>A private, modern place for your everyday conversations.</p>
+        </section>
+        <section class="intro-slide" data-slide="1">
+          <div class="intro-hero-icon">◉</div>
+          <div class="intro-kicker">CHAT & CONNECT</div>
+          <h1>Everything in<br><strong>one conversation.</strong></h1>
+          <p>Send messages in real time, create groups, and make voice or video calls.</p>
+          <div class="intro-feature-grid"><span>💬 Messages</span><span>👥 Groups</span><span>☎ Calls</span><span>🎥 Video</span></div>
+        </section>
+        <section class="intro-slide" data-slide="2">
+          <div class="intro-hero-icon">◒</div>
+          <div class="intro-kicker">MAKE IT YOURS</div>
+          <h1>Your MissApp,<br><strong>your style.</strong></h1>
+          <p>Choose themes and keep your conversations organized with chat controls and preferences.</p>
+        </section>
+        <section class="intro-slide" data-slide="3">
+          <div class="intro-hero-icon">✓</div>
+          <div class="intro-kicker">ONE LAST STEP</div>
+          <h1>Set up your<br><strong>profile.</strong></h1>
+          <p>Choose the name people will see when you chat.</p>
+          <label class="intro-profile-label" for="intro-display-name">Display name</label>
+          <input id="intro-display-name" class="intro-profile-input" maxlength="60" autocomplete="name">
+        </section>
+      </div>
+      <div class="intro-dots" aria-label="Onboarding progress">
+        <button type="button" data-intro-dot="0" aria-label="Slide 1"></button>
+        <button type="button" data-intro-dot="1" aria-label="Slide 2"></button>
+        <button type="button" data-intro-dot="2" aria-label="Slide 3"></button>
+        <button type="button" data-intro-dot="3" aria-label="Slide 4"></button>
+      </div>
+      <div class="intro-actions">
+        <button type="button" id="intro-back" class="intro-secondary">Back</button>
+        <button type="button" id="intro-next" class="intro-primary">Continue</button>
+      </div>
+      <button type="button" id="intro-skip" class="intro-skip">Skip intro</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const slides = [...overlay.querySelectorAll(".intro-slide")];
+  const dots = [...overlay.querySelectorAll("[data-intro-dot]")];
+  const nameInput = overlay.querySelector("#intro-display-name");
+  nameInput.value = state.me?.displayName || state.me?.username || state.user?.email?.split("@")[0] || "";
+
+  let current = 0;
+  const render = () => {
+    slides.forEach((slide, i) => slide.classList.toggle("active", i === current));
+    dots.forEach((dot, i) => dot.classList.toggle("active", i === current));
+    overlay.querySelector("#intro-back").style.visibility = current === 0 ? "hidden" : "visible";
+    overlay.querySelector("#intro-next").textContent = current === slides.length - 1 ? "Start using MissApp" : "Continue";
+    overlay.querySelector("#intro-skip").textContent = current === slides.length - 1 ? "I'll do this later" : "Skip intro";
+  };
+  const finish = async () => {
+    const displayName = nameInput.value.trim();
+    if (!displayName) {
+      nameInput.focus();
+      return;
+    }
+    try {
+      await updateDoc(doc(db, "users", state.user.uid), {
+        displayName,
+        username: displayName,
+        key: displayName.toLowerCase()
+      });
+      state.me.displayName = displayName;
+      state.me.username = displayName;
+      state.me.key = displayName.toLowerCase();
+      updateCurrentUserUI();
+    } catch (error) {
+      console.error("Intro profile update failed:", error);
+      showToast("Could not save your profile name.", "error");
+      return;
+    }
+    localStorage.setItem("missapp-intro-complete", "1");
+    overlay.classList.add("closing");
+    setTimeout(() => overlay.remove(), 260);
+  };
+  overlay.querySelector("#intro-next").addEventListener("click", () => {
+    if (current === slides.length - 1) finish();
+    else { current += 1; render(); }
+  });
+  overlay.querySelector("#intro-back").addEventListener("click", () => {
+    if (current > 0) { current -= 1; render(); }
+  });
+  dots.forEach((dot, i) => dot.addEventListener("click", () => { current = i; render(); }));
+  overlay.querySelector("#intro-skip").addEventListener("click", finish);
+  nameInput.addEventListener("keydown", event => {
+    if (event.key === "Enter") { event.preventDefault(); finish(); }
+  });
+  render();
 }
 
 function setAuthLoading(loading) {
