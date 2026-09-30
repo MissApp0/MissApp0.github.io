@@ -1457,7 +1457,7 @@ function archiveCurrentChat() {
   if (!conversation) return;
   localStorage.setItem(chatLocalKey("archived"), "1");
   closeChatOptions();
-  document.querySelector(`[data-conversation-id="${CSS.escape(conversation.id)}"`)?.remove();
+  document.querySelector(`[data-conversation-id="${CSS.escape(conversation.id)}"]`)?.remove();
   document.body.classList.remove("chat-open");
   currentConversationId = null;
   state.currentConversation = null;
