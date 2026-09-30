@@ -103,6 +103,7 @@ let ringtoneLoad = null;
 let customRingtoneAudio = null;
 let midiLoopTimer = null;
 let previewTimer = null;
+let ringtonePlaybackToken = 0;
 const activeOscillators = new Set();
 
 /* ------------------------------------------------------------------ */
@@ -326,6 +327,9 @@ export async function clearCustomRingtone() {
 }
 
 export function stopCustomRingtone() {
+  // Invalidate any in-flight MP3 play() rejection or MIDI loop callback.
+  // This prevents a ringtone from being re-queued after cancellation/acceptance.
+  ringtonePlaybackToken += 1;
   pendingSounds = pendingSounds.filter(item => !RING_SOUNDS.includes(item.name));
 
   if (midiLoopTimer) {
@@ -365,6 +369,7 @@ function playMp3Ringtone(name) {
     ringtone.url = URL.createObjectURL(new Blob([ringtone.buffer], { type: "audio/mpeg" }));
   }
 
+  const playbackToken = ++ringtonePlaybackToken;
   const audio = new Audio(ringtone.url);
   audio.volume = settings.volume;
   audio.loop = true;
@@ -372,7 +377,7 @@ function playMp3Ringtone(name) {
 
   const fail = () => {
     if (customRingtoneAudio === audio) customRingtoneAudio = null;
-    if (name) queueSound(name); // retry after the next user gesture
+    if (name && ringtonePlaybackToken === playbackToken) queueSound(name); // retry only if this playback is still active
   };
   audio.addEventListener("error", fail, { once: true });
   audio.play().catch(fail);
@@ -520,8 +525,10 @@ function playMidiRingtone() {
   if (!plan || !ctx || ctx.state !== "running") return false;
 
   stopCustomRingtone();
+  const playbackToken = ++ringtonePlaybackToken;
 
   const playPass = () => {
+    if (ringtonePlaybackToken !== playbackToken) return;
     if (ctx.state === "running") {
       const now = ctx.currentTime;
       const base = Math.max(.01, settings.volume * .16);
