@@ -344,3 +344,23 @@ button, input, textarea, select, .btn {
 .call-message-copy { display: flex; flex-direction: column; gap: 2px; min-width: 110px; }
 .call-message-copy span { font-size: 12px; opacity: .7; }
 .call-rejoin-button { border: 0; border-radius: 8px; padding: 6px 10px; cursor: pointer; font: inherit; }
+
+/* Chat options menu */
+.chat-options-wrap { position: relative; display: flex; align-items: center; }
+.chat-options-button {
+  width: 40px; height: 40px; display: grid; place-items: center;
+  border-radius: 10px; background: transparent; color: var(--text-muted);
+  font-size: 25px; line-height: 1;
+}
+.chat-options-button:hover { background: var(--panel-hover); color: var(--text); }
+.chat-options-menu {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 1200;
+  width: 180px; padding: 6px; border: 1px solid var(--border);
+  border-radius: 13px; background: var(--panel); box-shadow: 0 14px 35px rgba(20,35,42,.18);
+}
+.chat-options-menu button {
+  width: 100%; padding: 10px 12px; border-radius: 9px;
+  background: transparent; color: var(--text); text-align: left; font-weight: 600;
+}
+.chat-options-menu button:hover { background: var(--panel-hover); }
+.chat-options-menu button.danger { color: var(--danger); }
