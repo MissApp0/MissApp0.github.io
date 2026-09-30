@@ -648,9 +648,14 @@ function showCallScreen(call) {
     </div>
     <video id="local-video" class="local-video" autoplay muted playsinline></video>
     <div class="call-controls">
-      <button id="toggle-mic" class="call-control" title="Mute microphone">🎙</button>
-      ${call.type === "video" ? '<button id="toggle-camera" class="call-control" title="Camera">📹</button><button id="switch-camera" class="call-control" title="Switch camera">🔄</button><button id="share-screen" class="call-control" title="Share screen">🖥</button>' : ""}
       <button id="end-call" class="call-control end" title="End call">☎</button>
+      <div class="call-options-wrap">
+        <button id="call-options-button" class="call-control call-options-button" type="button" title="Call options" aria-label="Call options" aria-expanded="false">⋮</button>
+        <div id="call-options-menu" class="call-options-menu hidden" role="menu">
+          <button id="call-menu-mic" type="button" role="menuitem">🎙 Mute microphone</button>
+          ${call.type === "video" ? '<button id="call-menu-camera" type="button" role="menuitem">📹 Camera</button><button id="call-menu-switch-camera" type="button" role="menuitem">🔄 Switch camera</button><button id="call-menu-share-screen" type="button" role="menuitem">🖥 Share screen</button>' : ""}
+        </div>
+      </div>
     </div>
   `;
 
@@ -663,24 +668,48 @@ function showCallScreen(call) {
 
   screen.querySelector("#end-call").addEventListener("click", () => endActiveCall(true));
 
-  screen.querySelector("#toggle-mic").addEventListener("click", event => {
+  const optionsButton = screen.querySelector("#call-options-button");
+  const optionsMenu = screen.querySelector("#call-options-menu");
+  optionsButton?.addEventListener("click", event => {
+    event.stopPropagation();
+    const open = !optionsMenu?.classList.contains("hidden");
+    optionsMenu?.classList.toggle("hidden", open);
+    optionsButton.setAttribute("aria-expanded", String(!open));
+  });
+
+  screen.querySelector("#call-menu-mic")?.addEventListener("click", event => {
     const track = call.stream.getAudioTracks()[0];
     if (!track) return;
     track.enabled = !track.enabled;
-    event.currentTarget.classList.toggle("off", !track.enabled);
+    event.currentTarget.textContent = track.enabled ? "🎙 Mute microphone" : "🔇 Unmute microphone";
   });
 
-  screen.querySelector("#switch-camera")?.addEventListener("click", async () => {
-    try { await switchCamera(); } catch (error) { console.error("Switch camera error:", error); setCallStatus("Could not switch camera."); }
-  });
-  screen.querySelector("#share-screen")?.addEventListener("click", async () => {
-    try { await toggleScreenShare(); } catch (error) { console.error("Screen share error:", error); setCallStatus("Could not share your screen."); }
-  });
-  screen.querySelector("#toggle-camera")?.addEventListener("click", event => {
+  screen.querySelector("#call-menu-camera")?.addEventListener("click", event => {
     const track = call.stream.getVideoTracks()[0];
     if (!track) return;
     track.enabled = !track.enabled;
-    event.currentTarget.classList.toggle("off", !track.enabled);
+    event.currentTarget.textContent = track.enabled ? "📹 Camera" : "📷 Turn camera on";
+  });
+
+  screen.querySelector("#call-menu-switch-camera")?.addEventListener("click", async () => {
+    try { await switchCamera(); } catch (error) { console.error("Switch camera error:", error); setCallStatus("Could not switch camera."); }
+  });
+
+  screen.querySelector("#call-menu-share-screen")?.addEventListener("click", async event => {
+    try {
+      await toggleScreenShare();
+      event.currentTarget.textContent = call.screenTrack ? "🛑 Stop screen share" : "🖥 Share screen";
+    } catch (error) {
+      console.error("Screen share error:", error);
+      setCallStatus("Could not share your screen.");
+    }
+  });
+
+  screen.addEventListener("click", event => {
+    if (optionsMenu && !optionsMenu.contains(event.target) && event.target !== optionsButton) {
+      optionsMenu.classList.add("hidden");
+      optionsButton?.setAttribute("aria-expanded", "false");
+    }
   });
 }
 
