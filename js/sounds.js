@@ -1,887 +1,399 @@
-import { auth, db } from "./firebase.js";
-import { turnConfig } from "./config.js";
-import { playSound, stopCustomRingtone, isDoNotDisturb } from "./sounds.js";
-import {
-  addDoc,
-  collection,
-  doc,
-  getDoc,
-  onSnapshot,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  query,
-  where
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+const STORAGE_KEY = "missapp.soundSettings";
 
-const stunServers = [
-  { urls: "stun:stun.l.google.com:19302" },
-  { urls: "stun:stun1.l.google.com:19302" },
-  { urls: "stun:stun.cloudflare.com:3478" }
-];
-
-function buildIceServers() {
-  const urls = Array.isArray(turnConfig?.urls)
-    ? turnConfig.urls.filter(Boolean)
-    : [];
-
-  const hasCredentials =
-    Boolean(turnConfig?.username) &&
-    Boolean(turnConfig?.credential);
-
-  const turnServers = hasCredentials && urls.length
-    ? [{
-        urls,
-        username: turnConfig.username,
-        credential: turnConfig.credential,
-        ...(turnConfig.credentialType
-          ? { credentialType: turnConfig.credentialType }
-          : {})
-      }]
-    : [];
-
-  return [...stunServers, ...turnServers];
-}
-
-const rtcConfig = {
-  iceServers: buildIceServers(),
-  iceCandidatePoolSize: 10,
-  bundlePolicy: "max-bundle",
-  rtcpMuxPolicy: "require",
-  iceTransportPolicy: "all"
+const defaults = {
+  enabled: true,
+  volume: 0.7,
+  soundType: "classic",
+  messageSent: true,
+  messageReceived: true,
+  incomingCall: true,
+  callRinging: true,
+  callConnected: true,
+  status: true,
+  doNotDisturb: false,
+  customRingtone: null
 };
 
-const CALL_TIMEOUT_MS = 30000;
-const RECONNECT_GRACE_MS = 12000;
-const OFFER_WAIT_ATTEMPTS = 20;
-const OFFER_WAIT_DELAY_MS = 500;
+let settings = loadSettings();
+let audioContext = null;
+let audioUnlocked = false;
+let pendingSounds = [];
+let customRingtoneUrl = null;
+let customRingtoneBuffer = null;
+let customRingtoneName = "";
+let customRingtoneType = "";
+let customRingtoneAudio = null;
+let customRingtoneOscillators = [];
 
-let activeCall = null;
-let pendingCallResources = null;
-let incomingUnsubscribe = null;
-let callTimeout = null;
-let ringingTimer = null;
-let incomingCallId = null;
+const RINGTONE_DB = "missapp-ringtones";
+const RINGTONE_STORE = "files";
 
-function startOutgoingRinging() {
-  stopOutgoingRinging();
-  playSound("callRinging");
-  ringingTimer = setInterval(() => playSound("callRinging"), 2500);
+function openRingtoneDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(RINGTONE_DB, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(RINGTONE_STORE);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
 }
-function stopOutgoingRinging() {
-  if (ringingTimer) clearInterval(ringingTimer);
-  ringingTimer = null;
+
+async function loadCustomRingtone() {
+  if (customRingtoneBuffer) return;
+  try {
+    const db = await openRingtoneDb();
+    const data = await new Promise((resolve, reject) => {
+      const tx = db.transaction(RINGTONE_STORE, "readonly");
+      const request = tx.objectStore(RINGTONE_STORE).get("custom");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
+    if (!data?.buffer) return;
+    customRingtoneBuffer = data.buffer;
+    customRingtoneName = data.name || "Custom ringtone";
+    customRingtoneType = data.type || "";
+    settings.customRingtone = { name: customRingtoneName, type: customRingtoneType };
+  } catch (error) {
+    console.warn("MissApp custom ringtone load failed:", error);
+  }
 }
-async function replaceVideoTrack(call, newTrack) {
-  const sender = call?.peer?.getSenders().find(item => item.track?.kind === "video");
-  if (!sender || !newTrack) return false;
-  const old = call.stream.getVideoTracks()[0];
-  await sender.replaceTrack(newTrack);
-  if (old && old !== newTrack) old.stop();
-  if (old) call.stream.removeTrack(old);
-  call.stream.addTrack(newTrack);
-  const local = document.getElementById("local-video");
-  if (local) local.srcObject = call.stream;
+
+export async function importCustomRingtone(file) {
+  if (!file) throw new Error("Choose a ringtone file first.");
+  const type = String(file.type || "").toLowerCase();
+  const name = String(file.name || "ringtone");
+  const extension = name.split(".").pop()?.toLowerCase();
+  const isMp3 = type === "audio/mpeg" || extension === "mp3";
+  const isMidi = ["mid", "midi"].includes(extension) || type.includes("midi");
+  if (!isMp3 && !isMidi) throw new Error("Only MP3 and MIDI files can be used as custom ringtones.");
+  const buffer = await file.arrayBuffer();
+  const db = await openRingtoneDb();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(RINGTONE_STORE, "readwrite");
+    tx.objectStore(RINGTONE_STORE).put({ buffer, name, type: isMp3 ? "mp3" : "midi" }, "custom");
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+  customRingtoneBuffer = buffer;
+  customRingtoneName = name;
+  customRingtoneType = isMp3 ? "mp3" : "midi";
+  settings.customRingtone = { name, type: customRingtoneType };
+  persist();
+  return { name, type: customRingtoneType };
+}
+
+export async function clearCustomRingtone() {
+  try {
+    const db = await openRingtoneDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(RINGTONE_STORE, "readwrite");
+      tx.objectStore(RINGTONE_STORE).delete("custom");
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch (error) {
+    console.warn("MissApp custom ringtone clear failed:", error);
+  }
+  stopCustomRingtone();
+  if (customRingtoneUrl) URL.revokeObjectURL(customRingtoneUrl);
+  customRingtoneUrl = null;
+  customRingtoneBuffer = null;
+  customRingtoneName = "";
+  customRingtoneType = "";
+  settings.customRingtone = null;
+  persist();
+}
+
+export function stopCustomRingtone() {
+  pendingSounds = pendingSounds.filter(name => name !== "incomingCall" && name !== "callRinging");
+  if (customRingtoneAudio) {
+    customRingtoneAudio.pause();
+    customRingtoneAudio.currentTime = 0;
+    customRingtoneAudio.src = "";
+    customRingtoneAudio = null;
+  }
+  customRingtoneOscillators.forEach(({ osc }) => {
+    try { osc.stop(); } catch {}
+  });
+  customRingtoneOscillators = [];
+}
+
+function playMp3Ringtone() {
+  if (!customRingtoneBuffer) return false;
+  stopCustomRingtone();
+  const blob = new Blob([customRingtoneBuffer], { type: "audio/mpeg" });
+  customRingtoneUrl = URL.createObjectURL(blob);
+  const audio = new Audio(customRingtoneUrl);
+  customRingtoneAudio = audio;
+  audio.volume = settings.volume;
+  audio.loop = true;
+  audio.addEventListener("ended", () => {
+    if (customRingtoneAudio === audio) customRingtoneAudio = null;
+    if (customRingtoneUrl) {
+      URL.revokeObjectURL(customRingtoneUrl);
+      customRingtoneUrl = null;
+    }
+  }, { once: true });
+  audio.play().catch(() => {
+    if (customRingtoneAudio === audio) customRingtoneAudio = null;
+  });
   return true;
 }
-async function switchCamera() {
-  const call = activeCall;
-  if (!call?.stream?.getVideoTracks().length) return;
-  const cameras = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
-  if (cameras.length < 2) { setCallStatus("Only one camera is available."); return; }
-  const current = call.stream.getVideoTracks()[0].getSettings?.().deviceId;
-  const next = cameras.find(d => d.deviceId !== current) || cameras[0];
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { deviceId: { exact: next.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } });
-  await replaceVideoTrack(call, stream.getVideoTracks()[0]);
-}
-function isMobileCallDevice() {
-  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
-}
 
-async function toggleScreenShare() {
-  const call = activeCall;
-  if (!call?.peer) return;
-  const sender = call.peer.getSenders().find(item => item.track?.kind === "video");
-  if (!sender) { setCallStatus("Screen sharing requires a video call."); return; }
-
-  if (call.screenTrack) {
-    const camera = call.cameraTrack;
-    if (camera) await sender.replaceTrack(camera);
-    call.screenTrack.stop();
-    call.screenTrack = null;
-    document.getElementById("local-video")?.setAttribute("srcObject", call.stream);
-    const local = document.getElementById("local-video");
-    if (local) local.srcObject = call.stream;
-    setCallStatus("Connected");
-    return;
-  }
-
-  if (!navigator.mediaDevices?.getDisplayMedia) {
-    setCallStatus(isMobileCallDevice()
-      ? "Your mobile browser does not provide screen sharing."
-      : "Screen sharing is not supported in this browser.");
-    return;
-  }
-
-  try {
-    const display = await navigator.mediaDevices.getDisplayMedia({
-      video: { frameRate: { ideal: 20, max: 30 } },
-      audio: false
-    });
-    const screenTrack = display.getVideoTracks()[0];
-    if (!screenTrack) throw new Error("No screen track was returned.");
-    call.cameraTrack = call.stream.getVideoTracks()[0];
-    call.screenTrack = screenTrack;
-    await sender.replaceTrack(screenTrack);
-    const local = document.getElementById("local-video");
-    if (local) local.srcObject = new MediaStream([...call.stream.getAudioTracks(), screenTrack]);
-    screenTrack.onended = () => { if (activeCall?.id === call.id) toggleScreenShare().catch(() => {}); };
-    setCallStatus("Sharing screen");
-  } catch (error) {
-    if (error?.name === "NotAllowedError" || error?.name === "AbortError") {
-      setCallStatus("Screen sharing was cancelled.");
-      return;
+function readMidiEvents(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const text = String.fromCharCode(...bytes.slice(0, 4));
+  if (text !== "MThd") throw new Error("Invalid MIDI file.");
+  const view = new DataView(buffer);
+  const tracks = view.getUint16(10);
+  const division = view.getUint16(12);
+  let offset = 14;
+  const events = [];
+  for (let track = 0; track < tracks; track++) {
+    if (String.fromCharCode(...bytes.slice(offset, offset + 4)) !== "MTrk") break;
+    const length = view.getUint32(offset + 4);
+    let p = offset + 8;
+    const end = p + length;
+    let tick = 0;
+    let status = 0;
+    while (p < end) {
+      let delta = 0, b;
+      do { b = bytes[p++]; delta = (delta << 7) | (b & 0x7f); } while (b & 0x80 && p < end);
+      tick += delta;
+      let type = bytes[p];
+      if (type < 0x80) type = status; else { p++; status = type; }
+      const command = type & 0xf0;
+      if (command === 0x90 || command === 0x80) {
+        const note = bytes[p++];
+        const velocity = bytes[p++];
+        if (command === 0x90 && velocity) events.push({ tick, note, velocity, on: true });
+        else events.push({ tick, note, velocity, on: false });
+      } else if (command === 0xa0 || command === 0xb0 || command === 0xe0) p += 2;
+      else if (command === 0xc0 || command === 0xd0) p += 1;
+      else if (type === 0xff) { const meta = bytes[p++]; let len = 0, q; do { q = bytes[p++]; len = (len << 7) | (q & 0x7f); } while (q & 0x80); p += len; }
+      else if (type === 0xf0 || type === 0xf7) { let len = 0, q; do { q = bytes[p++]; len = (len << 7) | (q & 0x7f); } while (q & 0x80); p += len; }
+      else break;
     }
-    console.error("Screen share error:", error);
-    setCallStatus(isMobileCallDevice()
-      ? "Mobile screen sharing is unavailable on this browser."
-      : "Could not start screen sharing.");
+    offset = end;
   }
+  return { events, division: division & 0x7fff };
 }
 
-function clearCallTimeout() {
-  if (callTimeout) {
-    clearTimeout(callTimeout);
-    callTimeout = null;
-  }
-}
-
-function armCallTimeout(callId) {
-  clearCallTimeout();
-  callTimeout = setTimeout(() => {
-    if (activeCall?.id !== callId) return;
-
-    const state = activeCall.peer?.connectionState;
-    if (state !== "connected") {
-      setCallStatus("No answer", "The call could not establish a connection.");
-      endActiveCall(true);
-    }
-  }, CALL_TIMEOUT_MS);
-}
-
-function setCallStatus(text, detail = "") {
-  const status = document.getElementById("call-status");
-  if (status) status.textContent = text;
-
-  const sub = document.getElementById("call-status-detail");
-  if (sub) sub.textContent = detail;
-}
-
-function getCallCapabilities() {
-  return {
-    webrtc: typeof RTCPeerConnection !== "undefined",
-    media: Boolean(navigator.mediaDevices?.getUserMedia),
-    secureContext: window.isSecureContext,
-    video: Boolean(document.createElement("video").canPlayType),
-    turnConfigured: buildIceServers().some(server => {
-      const urls = Array.isArray(server.urls) ? server.urls : [server.urls];
-      return urls.some(url => String(url).startsWith("turn:") || String(url).startsWith("turns:"));
-    })
-  };
-}
-
-function attachPeerMonitoring(peer, call) {
-  peer.onconnectionstatechange = () => {
-    const status = document.getElementById("call-status");
-
-    if (peer.connectionState === "connected") {
-      clearCallTimeout();
-      stopOutgoingRinging();
-      playSound("callConnected");
-      setCallStatus("Connected");
-      logSelectedIceRoute(peer);
-      return;
-    }
-
-    if (peer.connectionState === "connecting") {
-      setCallStatus("Connecting…");
-      return;
-    }
-
-    if (peer.connectionState === "disconnected") {
-      setCallStatus("Reconnecting…");
-      setTimeout(() => {
-        if (activeCall?.id === call.id &&
-            activeCall.peer?.connectionState === "disconnected") {
-          setCallStatus("Connection lost");
-        }
-      }, RECONNECT_GRACE_MS);
-      return;
-    }
-
-    if (peer.connectionState === "failed") {
-      setCallStatus("Connection failed", "Check your network or TURN configuration.");
-      setTimeout(() => {
-        if (activeCall?.id === call.id) {
-          endActiveCall(true);
-        }
-      }, 1200);
-    }
-  };
-
-  peer.oniceconnectionstatechange = () => {
-    console.log("MissApp ICE state:", peer.iceConnectionState);
-
-    const status = document.getElementById("call-status");
-
-    if (peer.iceConnectionState === "checking") {
-      if (status) status.textContent = "Connecting…";
-    } else if (peer.iceConnectionState === "connected" ||
-               peer.iceConnectionState === "completed") {
-      if (status) status.textContent = "Connected";
-    } else if (peer.iceConnectionState === "disconnected") {
-      if (status) status.textContent = "Reconnecting…";
-    } else if (peer.iceConnectionState === "failed") {
-      if (status) status.textContent = "Network connection failed";
-    }
-  };
-
-  peer.onicegatheringstatechange = () => {
-    console.log("MissApp ICE gathering:", peer.iceGatheringState);
-  };
-
-  peer.onicecandidateerror = event => {
-    console.warn("MissApp ICE candidate error:", {
-      url: event.url,
-      errorCode: event.errorCode,
-      errorText: event.errorText
-    });
-  };
-}
-
-function addRemoteCandidate(peer, candidate) {
-  if (!candidate) return;
-
-  if (!peer.remoteDescription) {
-    peer.__missappIceQueue = peer.__missappIceQueue || [];
-    peer.__missappIceQueue.push(candidate);
-    return;
-  }
-
-  peer.addIceCandidate(candidate).catch(error => {
-    console.error("ICE candidate error:", error);
-  });
-}
-
-async function flushRemoteCandidates(peer) {
-  const queue = peer.__missappIceQueue || [];
-  peer.__missappIceQueue = [];
-
-  for (const candidate of queue) {
-    try {
-      await peer.addIceCandidate(candidate);
-    } catch (error) {
-      console.error("Queued ICE candidate error:", error);
-    }
-  }
-}
-
-export function initCalls() {
-  if (!auth.currentUser) return;
-  listenForIncomingCalls();
-}
-
-function listenForIncomingCalls() {
-  incomingUnsubscribe?.();
-
-  const callsRef = query(
-    collection(db, "calls"),
-    where("callee", "==", auth.currentUser.uid)
-  );
-
-  incomingUnsubscribe = onSnapshot(callsRef, snapshot => {
-    snapshot.docChanges().forEach(change => {
-      if (change.type !== "added" && change.type !== "modified") return;
-
-      const call = { id: change.doc.id, ...change.doc.data() };
-
-      if (
-        call.callee === auth.currentUser?.uid &&
-        call.status === "ringing" &&
-        !activeCall &&
-        incomingCallId !== call.id
-      ) {
-        incomingCallId = call.id;
-        playSound("incomingCall");
-        showIncomingCall(call);
-      }
-    });
-  }, error => {
-    console.error("Incoming call listener error:", error);
-  });
-}
-
-export async function startCall({ calleeId, calleeName, video = false }) {
-  if (!auth.currentUser || !calleeId) {
-    throw new Error("The other user could not be identified.");
-  }
-
-  const capabilities = getCallCapabilities();
-  if (!capabilities.webrtc || !capabilities.media) {
-    throw new Error("This browser does not support camera and microphone calling.");
-  }
-  if (!capabilities.secureContext) {
-    throw new Error("Calls require HTTPS. Open MissApp through its secure HTTPS address.");
-  }
-
-  if (activeCall) {
-    throw new Error("A call is already active.");
-  }
-
-  if (!navigator.mediaDevices?.getUserMedia) {
-    throw new Error("Camera and microphone are not available in this browser.");
-  }
-
-  let stream;
-
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      },
-      video: video
-        ? {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            frameRate: { ideal: 30, max: 30 }
-          }
-        : false
-    });
-  } catch (error) {
-    throw new Error(getMediaError(error));
-  }
-
-  const peer = new RTCPeerConnection(rtcConfig);
-  pendingCallResources = { stream, peer };
-  stream.getTracks().forEach(track => peer.addTrack(track, stream));
-
-  const callRef = doc(collection(db, "calls"));
-  const caller = auth.currentUser.uid;
-
-  const call = {
-    id: callRef.id,
-    caller,
-    callee: calleeId,
-    callerName: auth.currentUser.displayName || auth.currentUser.email?.split("@")[0] || "User",
-    calleeName: calleeName || "User",
-    type: video ? "video" : "voice",
-    status: "ringing",
-    createdAt: serverTimestamp()
-  };
-
-  attachPeerMonitoring(peer, call);
-
-  const remoteStream = new MediaStream();
-  peer.ontrack = event => {
-    event.streams[0]?.getTracks().forEach(track => remoteStream.addTrack(track));
-    attachRemoteStream(remoteStream);
-  };
-
-  peer.onicecandidate = async event => {
-    if (!event.candidate) return;
-    await addDoc(collection(db, "calls", callRef.id, "callerCandidates"), event.candidate.toJSON());
-  };
-
-  await setDoc(callRef, call);
-
-  const offer = await peer.createOffer();
-  await peer.setLocalDescription(offer);
-  await updateDoc(callRef, { offer: { type: offer.type, sdp: offer.sdp } });
-
-  activeCall = {
-    ...call,
-    peer,
-    stream,
-    remoteStream,
-    role: "caller",
-    dataChannel: null,
-    unsubscribers: []
-  };
-  pendingCallResources = null;
-
-  listenForAnswer(callRef.id, peer);
-  listenForCalleeCandidates(callRef.id, peer);
-
-  showCallScreen(activeCall);
-  startOutgoingRinging();
-  armCallTimeout(call.id);
-  return activeCall;
-}
-
-async function answerCall(call) {
-  if (!auth.currentUser || activeCall) return;
-
+function playMidiRingtone() {
   stopCustomRingtone();
-  stopOutgoingRinging();
-  incomingCallId = null;
-
-  if (!navigator.mediaDevices?.getUserMedia) {
-    throw new Error("Camera and microphone are not available in this browser.");
-  }
-
-  const video = call.type === "video";
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: true,
-    video
-  });
-
-  const peer = new RTCPeerConnection(rtcConfig);
-  stream.getTracks().forEach(track => peer.addTrack(track, stream));
-
-  const remoteStream = new MediaStream();
-  peer.ontrack = event => {
-    event.streams[0]?.getTracks().forEach(track => remoteStream.addTrack(track));
-    attachRemoteStream(remoteStream);
-  };
-
-  peer.onicecandidate = async event => {
-    if (!event.candidate) return;
-    await addDoc(collection(db, "calls", call.id, "calleeCandidates"), event.candidate.toJSON());
-  };
-
-  attachPeerMonitoring(peer, call);
-
-  const callRef = doc(db, "calls", call.id);
-  let snapshot = null;
-
-  for (let attempt = 0; attempt < OFFER_WAIT_ATTEMPTS; attempt += 1) {
-    snapshot = await getDoc(callRef);
-
-    if (!snapshot.exists()) {
-      stream.getTracks().forEach(track => track.stop());
-      peer.close();
-      throw new Error("This call is no longer available.");
-    }
-
-    const data = snapshot.data();
-
-    if (data.offer?.sdp && data.offer?.type) {
-      break;
-    }
-
-    if (attempt < OFFER_WAIT_ATTEMPTS - 1) {
-      await new Promise(resolve => setTimeout(resolve, OFFER_WAIT_DELAY_MS));
-    }
-  }
-
-  const data = snapshot?.data();
-
-  if (!data?.offer?.sdp || !data?.offer?.type) {
-    stream.getTracks().forEach(track => track.stop());
-    peer.close();
-    throw new Error("The call offer was not ready. Please try accepting again.");
-  }
-
-  await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
-  await flushRemoteCandidates(peer);
-
-  const answer = await peer.createAnswer();
-  await peer.setLocalDescription(answer);
-
-  await updateDoc(callRef, {
-    answer: { type: answer.type, sdp: answer.sdp },
-    status: "connected"
-  });
-
-  activeCall = {
-    ...call,
-    peer,
-    stream,
-    remoteStream,
-    role: "callee",
-    dataChannel: peer.__missappDataChannel || null,
-    unsubscribers: []
-  };
-
-  listenForCallerCandidates(call.id, peer);
-  listenForCallState(call.id);
-
-  showCallScreen(activeCall);
-  clearCallTimeout();
-}
-
-function listenForAnswer(callId, peer) {
-  const unsub = onSnapshot(doc(db, "calls", callId), async snapshot => {
-    const data = snapshot.data();
-    if (!data) return;
-
-    if (data.status === "declined" || data.status === "ended") {
-      endActiveCall(false);
-      return;
-    }
-
-    if (!data.answer || peer.currentRemoteDescription) return;
-
-    try {
-      await peer.setRemoteDescription(new RTCSessionDescription(data.answer));
-      await flushRemoteCandidates(peer);
-      await updateDoc(doc(db, "calls", callId), { status: "connected" });
-    } catch (error) {
-      console.error("Set remote answer error:", error);
-    }
-  });
-
-  activeCall?.unsubscribers.push(unsub);
-}
-
-function listenForCallState(callId) {
-  const unsub = onSnapshot(doc(db, "calls", callId), snapshot => {
-    const data = snapshot.data();
-    if (!data || data.status === "ended" || data.status === "declined") {
-      endActiveCall(false);
-    }
-  });
-
-  activeCall?.unsubscribers.push(unsub);
-}
-
-function listenForCalleeCandidates(callId, peer) {
-  const unsub = onSnapshot(collection(db, "calls", callId, "calleeCandidates"), snapshot => {
-    snapshot.docChanges().forEach(change => {
-      if (change.type === "added") {
-        addRemoteCandidate(peer, new RTCIceCandidate(change.doc.data()));
-      }
-    });
-  });
-
-  activeCall?.unsubscribers.push(unsub);
-}
-
-function listenForCallerCandidates(callId, peer) {
-  const unsub = onSnapshot(collection(db, "calls", callId, "callerCandidates"), snapshot => {
-    snapshot.docChanges().forEach(change => {
-      if (change.type === "added") {
-        addRemoteCandidate(
-          peer,
-          new RTCIceCandidate(change.doc.data())
-        );
-      }
-    });
-  });
-
-  activeCall?.unsubscribers.push(unsub);
-}
-
-export async function declineCall(callId) {
-  incomingCallId = null;
-  stopCustomRingtone();
-  stopOutgoingRinging();
+  const ctx = getAudioContext();
+  if (!ctx || ctx.state !== "running" || !customRingtoneBuffer) return false;
   try {
-    await updateDoc(doc(db, "calls", callId), {
-      status: "declined",
-      endedAt: serverTimestamp()
-    });
-  } finally {
-    hideIncomingCall();
-  }
-}
-
-export async function endActiveCall(notify = true) {
-  const call = activeCall;
-  if (!call) {
-    // The caller can cancel while startCall is still creating the offer.
-    // Release the media acquired before activeCall is assigned.
-    if (pendingCallResources) {
-      pendingCallResources.stream?.getTracks().forEach(track => track.stop());
-      pendingCallResources.peer?.close();
-      pendingCallResources = null;
-    }
-    stopCustomRingtone();
-    stopOutgoingRinging();
-    hideCallScreen();
-    return;
-  }
-
-  activeCall = null;
-  clearCallTimeout();
-  stopCustomRingtone();
-  stopOutgoingRinging();
-
-  // Release microphone, camera, screen share, and WebRTC immediately.
-  // Do this before any Firestore/network work so browser permissions stop at once.
-  call.unsubscribers?.forEach(unsub => unsub());
-  call.unsubscribers = [];
-
-  if (call.screenTrack) {
-    call.screenTrack.onended = null;
-    call.screenTrack.stop();
-    call.screenTrack = null;
-  }
-  if (call.cameraTrack && !call.stream?.getVideoTracks().includes(call.cameraTrack)) {
-    call.cameraTrack.stop();
-  }
-  call.stream?.getTracks().forEach(track => track.stop());
-  call.remoteStream?.getTracks().forEach(track => track.stop());
-  call.peer?.close();
-
-  hideCallScreen();
-
-  if (notify) {
-    try {
-      await updateDoc(doc(db, "calls", call.id), {
-        status: "ended",
-        endedAt: serverTimestamp()
+    const midi = readMidiEvents(customRingtoneBuffer);
+    const now = ctx.currentTime;
+    const secondsPerTick = 0.5 / Math.max(1, midi.division);
+    midi.events.slice(0, 250).forEach(event => {
+      const time = now + Math.min(8, event.tick * secondsPerTick);
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 440 * Math.pow(2, (event.note - 69) / 12);
+      const duration = 0.18;
+      gain.gain.setValueAtTime(event.on ? Math.max(.01, settings.volume * .16) : .0001, time);
+      gain.gain.exponentialRampToValueAtTime(.0001, time + duration);
+      osc.connect(gain).connect(ctx.destination);
+      customRingtoneOscillators.push({ osc, gain });
+      osc.addEventListener?.("ended", () => {
+        customRingtoneOscillators = customRingtoneOscillators.filter(item => item.osc !== osc);
       });
-    } catch (error) {
-      console.error("End call update error:", error);
-    }
+      osc.start(time);
+      osc.stop(time + duration + .03);
+    });
+    return true;
+  } catch (error) {
+    console.warn("MissApp MIDI ringtone playback failed:", error);
+    return false;
   }
+}
+
+loadCustomRingtone();
+
+function loadSettings() {
+  try {
+    return { ...defaults, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") };
+  } catch {
+    return { ...defaults };
+  }
+}
+
+function persist() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+}
+
+function getAudioContext() {
+  if (audioContext) return audioContext;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  audioContext = new Ctx();
+  audioContext.addEventListener?.("statechange", () => {
+    audioUnlocked = audioContext.state === "running";
+  });
+  return audioContext;
+}
+
+async function resumeAudio() {
+  const ctx = getAudioContext();
+  if (!ctx) return false;
 
   try {
-    const callSnapshot = await getDoc(doc(db, "calls", call.id));
-    const callData = callSnapshot.exists() ? callSnapshot.data() : {};
-    const messageId = call.messageId || callData.messageId;
-    const conversationId = call.conversationId || callData.conversationId;
-    if (messageId && conversationId) {
-      await deleteDoc(doc(db, "conversations", conversationId, "messages", messageId));
+    if (ctx.state !== "running") await ctx.resume();
+    audioUnlocked = ctx.state === "running";
+    if (audioUnlocked && pendingSounds.length) {
+      const queued = pendingSounds.splice(0);
+      queued.forEach(name => playSound(name));
     }
+    return audioUnlocked;
   } catch (error) {
-    console.debug("Call history cleanup failed:", error);
-  }
-
-}
-
-function showIncomingCall(call) {
-  if (window.missappDesktop?.showIncomingCall) {
-    window.missappDesktop.showIncomingCall({
-      callId: call.id,
-      callerName: call.callerName || "User",
-      type: call.type || "voice",
-      title: call.type === "video" ? "Incoming video call" : "Incoming voice call"
-    });
-    return;
-  }
-  const existing = document.getElementById("incoming-call");
-  if (existing) existing.remove();
-
-  const modal = document.createElement("div");
-  modal.id = "incoming-call";
-  modal.className = "call-modal";
-  modal.innerHTML = `
-    <div class="incoming-call-card">
-      <div class="call-avatar">${escapeHtml((call.callerName || "U").charAt(0).toUpperCase())}</div>
-      <div class="incoming-call-name">${escapeHtml(call.callerName || "User")}</div>
-      <div class="incoming-call-type">${call.type === "video" ? "Incoming video call" : "Incoming voice call"}</div>
-      <div class="incoming-call-actions">
-        <button class="call-action decline" id="decline-call">✕</button>
-        <button class="call-action accept" id="accept-call">✓</button>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(modal);
-
-  modal.querySelector("#decline-call").addEventListener("click", () => { stopCustomRingtone(); declineCall(call.id); });
-  modal.querySelector("#accept-call").addEventListener("click", async () => {
-    incomingCallId = null;
-    stopCustomRingtone();
-    stopOutgoingRinging();
-    modal.remove();
-    try {
-      await answerCall(call);
-    } catch (error) {
-      console.error("Answer call error:", error);
-      alert(error.message || "Could not answer the call.");
-      await declineCall(call.id);
-    }
-  });
-}
-
-function showCallScreen(call) {
-  hideIncomingCall();
-
-  let screen = document.getElementById("active-call");
-  if (screen) screen.remove();
-
-  screen = document.createElement("div");
-  screen.id = "active-call";
-  screen.className = "active-call";
-  screen.innerHTML = `
-    <video id="remote-video" class="remote-video" autoplay playsinline></video>
-    <div class="call-topbar">
-      <div class="call-name">${escapeHtml(call.role === "caller" ? call.calleeName : call.callerName)}</div>
-      <div class="call-status" id="call-status">Calling…</div>
-      <div class="call-status-detail" id="call-status-detail"></div>
-    </div>
-    <video id="local-video" class="local-video" autoplay muted playsinline></video>
-    <div class="call-controls">
-      <button id="end-call" class="call-control end" title="End call">☎</button>
-      <div class="call-options-wrap">
-        <button id="call-options-button" class="call-control call-options-button" type="button" title="Call options" aria-label="Call options" aria-expanded="false">⋮</button>
-        <div id="call-options-menu" class="call-options-menu hidden" role="menu">
-          <button id="call-menu-mic" type="button" role="menuitem">🎙 Mute microphone</button>
-          ${call.type === "video" ? '<button id="call-menu-camera" type="button" role="menuitem">📹 Camera</button><button id="call-menu-switch-camera" type="button" role="menuitem">🔄 Switch camera</button><button id="call-menu-share-screen" type="button" role="menuitem">🖥 Share screen</button>' : ""}
-        </div>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(screen);
-
-  const localVideo = screen.querySelector("#local-video");
-  const remoteVideo = screen.querySelector("#remote-video");
-  localVideo.srcObject = call.stream;
-  remoteVideo.srcObject = call.remoteStream;
-
-  screen.querySelector("#end-call").addEventListener("click", () => endActiveCall(true));
-
-  const optionsButton = screen.querySelector("#call-options-button");
-  const optionsMenu = screen.querySelector("#call-options-menu");
-  optionsButton?.addEventListener("click", event => {
-    event.stopPropagation();
-    const open = !optionsMenu?.classList.contains("hidden");
-    optionsMenu?.classList.toggle("hidden", open);
-    optionsButton.setAttribute("aria-expanded", String(!open));
-  });
-
-  screen.querySelector("#call-menu-mic")?.addEventListener("click", event => {
-    const track = call.stream.getAudioTracks()[0];
-    if (!track) return;
-    track.enabled = !track.enabled;
-    event.currentTarget.textContent = track.enabled ? "🎙 Mute microphone" : "🔇 Unmute microphone";
-  });
-
-  screen.querySelector("#call-menu-camera")?.addEventListener("click", event => {
-    const track = call.stream.getVideoTracks()[0];
-    if (!track) return;
-    track.enabled = !track.enabled;
-    event.currentTarget.textContent = track.enabled ? "📹 Camera" : "📷 Turn camera on";
-  });
-
-  screen.querySelector("#call-menu-switch-camera")?.addEventListener("click", async () => {
-    try { await switchCamera(); } catch (error) { console.error("Switch camera error:", error); setCallStatus("Could not switch camera."); }
-  });
-
-
-  screen.querySelector("#call-menu-share-screen")?.addEventListener("click", async event => {
-    try {
-      await toggleScreenShare();
-      event.currentTarget.textContent = call.screenTrack ? "🛑 Stop screen share" : "🖥 Share screen";
-    } catch (error) {
-      console.error("Screen share error:", error);
-      setCallStatus("Could not share your screen.");
-    }
-  });
-
-  screen.addEventListener("click", event => {
-    if (optionsMenu && !optionsMenu.contains(event.target) && event.target !== optionsButton) {
-      optionsMenu.classList.add("hidden");
-      optionsButton?.setAttribute("aria-expanded", "false");
-    }
-  });
-}
-
-function attachRemoteStream(stream) {
-  const video = document.getElementById("remote-video");
-  if (video) video.srcObject = stream;
-}
-
-function hideIncomingCall() {
-  document.getElementById("incoming-call")?.remove();
-}
-
-function hideCallScreen() {
-  document.getElementById("active-call")?.remove();
-}
-
-async function logSelectedIceRoute(peer) {
-  try {
-    const stats = await peer.getStats();
-    let selectedPair = null;
-    const candidates = new Map();
-
-    stats.forEach(report => {
-      if (report.type === "candidate-pair" &&
-          report.state === "succeeded" &&
-          (report.nominated || report.selected)) {
-        selectedPair = report;
-      }
-
-      if (report.type === "local-candidate" || report.type === "remote-candidate") {
-        candidates.set(report.id, report);
-      }
-    });
-
-    if (!selectedPair) return;
-
-    const local = candidates.get(selectedPair.localCandidateId);
-    const remote = candidates.get(selectedPair.remoteCandidateId);
-
-    console.log("MissApp selected ICE route:", {
-      localType: local?.candidateType,
-      localProtocol: local?.protocol,
-      remoteType: remote?.candidateType,
-      remoteProtocol: remote?.protocol
-    });
-  } catch (error) {
-    console.debug("MissApp ICE stats unavailable:", error);
+    audioUnlocked = false;
+    console.warn("MissApp audio resume failed:", error);
+    return false;
   }
 }
 
-function getMediaError(error) {
-  switch (error?.name) {
-    case "NotAllowedError":
-    case "PermissionDeniedError":
-      return "Camera or microphone permission was denied. Allow access in your browser settings and try again.";
-
-    case "NotFoundError":
-    case "DevicesNotFoundError":
-      return "No usable microphone or camera was found.";
-
-    case "NotReadableError":
-    case "TrackStartError":
-      return "Your camera or microphone is already being used by another app.";
-
-    case "OverconstrainedError":
-      return "The selected camera or microphone does not support the requested settings.";
-
-    case "SecurityError":
-      return "Camera and microphone access is blocked by browser security settings.";
-
-    default:
-      return error?.message || "Could not access the camera or microphone.";
-  }
+export async function unlockAudio() {
+  return resumeAudio();
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+function tone(frequency, duration = .1, offset = 0) {
+  const ctx = getAudioContext();
+  if (!ctx || ctx.state !== "running") return false;
+
+  const now = ctx.currentTime + offset;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(frequency, now);
+
+  const peak = Math.max(.02, settings.volume * .32);
+  gain.gain.setValueAtTime(.0001, now);
+  gain.gain.exponentialRampToValueAtTime(peak, now + .015);
+  gain.gain.exponentialRampToValueAtTime(.0001, now + duration);
+
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + duration + .03);
+  return true;
 }
 
-window.MissAppCalls = {
-  startCall,
-  answerCall,
-  declineCall,
-  endActiveCall,
-  getCallCapabilities
+export const soundTypes = {
+  classic: { name: "Classic", description: "Clean notification tones" },
+  soft: { name: "Soft", description: "Gentle, rounded tones" },
+  pop: { name: "Pop", description: "Bright and playful" },
+  pulse: { name: "Pulse", description: "Modern digital tones" },
+  retro: { name: "Retro", description: "Old-school electronic" }
 };
 
-if (window.missappDesktop?.onCallAction) {
-  window.missappDesktop.onCallAction(async action => {
-    if (action?.type === "accept" && action.callId) {
-      const snapshot = await getDoc(doc(db, "calls", action.callId));
-      if (snapshot.exists()) await answerCall({ id: action.callId, ...snapshot.data() });
-    } else if (action?.type === "decline" && action.callId) {
-      await declineCall(action.callId);
-    } else if (action?.type === "end") {
-      await endActiveCall(true);
+export function playSound(name) {
+  if (!settings.enabled || settings.volume <= 0 || settings[name] === false) return false;
+  if (settings.doNotDisturb && ["messageReceived", "incomingCall", "callRinging", "status"].includes(name)) return false;
+  if ((name === "incomingCall" || name === "callRinging") && customRingtoneBuffer) {
+    if (customRingtoneType === "mp3") return playMp3Ringtone();
+    if (customRingtoneType === "midi") return playMidiRingtone();
+  }
+
+  const ctx = getAudioContext();
+  if (!ctx || ctx.state !== "running") {
+    if (pendingSounds.length < 3) pendingSounds.push(name);
+    return false;
+  }
+
+  const patterns = {
+    classic: {
+      messageSent: [[620, .09, 0], [820, .1, .07]],
+      messageReceived: [[520, .11, 0], [690, .14, .08]],
+      incomingCall: [[740, .2, 0], [920, .2, .23], [740, .2, .46]],
+      callRinging: [[520, .18, 0], [700, .2, .22]],
+      callConnected: [[540, .1, 0], [720, .12, .1]],
+      status: [[460, .1, 0], [610, .12, .1]]
+    },
+    soft: {
+      messageSent: [[520, .12, 0], [660, .14, .09]],
+      messageReceived: [[440, .13, 0], [560, .16, .1]],
+      incomingCall: [[520, .18, 0], [660, .2, .2], [780, .22, .42]],
+      callRinging: [[420, .18, 0], [560, .2, .22]],
+      callConnected: [[420, .13, 0], [560, .15, .12]],
+      status: [[390, .13, 0], [500, .15, .11]]
+    },
+    pop: {
+      messageSent: [[700, .07, 0], [980, .08, .06]],
+      messageReceived: [[620, .08, 0], [860, .1, .07]],
+      incomingCall: [[820, .12, 0], [1040, .13, .15], [820, .12, .3], [1040, .13, .45]],
+      callRinging: [[700, .1, 0], [920, .12, .15]],
+      callConnected: [[660, .08, 0], [900, .1, .08]],
+      status: [[560, .08, 0], [760, .1, .07]]
+    },
+    pulse: {
+      messageSent: [[480, .06, 0], [760, .08, .07]],
+      messageReceived: [[400, .08, 0], [640, .09, .08]],
+      incomingCall: [[620, .1, 0], [820, .1, .14], [1020, .12, .28]],
+      callRinging: [[500, .09, 0], [720, .1, .14]],
+      callConnected: [[500, .07, 0], [800, .09, .08]],
+      status: [[430, .07, 0], [700, .09, .08]]
+    },
+    retro: {
+      messageSent: [[440, .07, 0], [660, .07, .08], [880, .08, .16]],
+      messageReceived: [[330, .08, 0], [520, .08, .09]],
+      incomingCall: [[660, .12, 0], [880, .12, .15], [660, .12, .3], [880, .12, .45]],
+      callRinging: [[440, .12, 0], [660, .12, .16], [880, .12, .32]],
+      callConnected: [[330, .08, 0], [520, .09, .09], [780, .1, .19]],
+      status: [[380, .08, 0], [570, .09, .09]]
     }
-  });
+  };
+
+  const pattern = patterns[settings.soundType]?.[name] || patterns.classic[name];
+  if (!pattern) return false;
+
+  pattern.forEach(x => tone(...x));
+  return true;
 }
+
+export async function previewCustomRingtone() {
+  stopCustomRingtone();
+  await loadCustomRingtone();
+  if (!customRingtoneBuffer) return false;
+  await resumeAudio();
+  if (customRingtoneType === "mp3") return playMp3Ringtone();
+  if (customRingtoneType === "midi") return playMidiRingtone();
+  return false;
+}
+
+export function getSoundSettings() {
+  return { ...settings };
+}
+
+export function updateSoundSettings(patch = {}) {
+  settings = { ...settings, ...patch };
+  persist();
+  return getSoundSettings();
+}
+
+export function isDoNotDisturb() {
+  return Boolean(settings.doNotDisturb);
+}
+
+export function resetSoundSettings() {
+  settings = { ...defaults };
+  persist();
+  return getSoundSettings();
+}
+
+const unlockFromGesture = () => {
+  unlockAudio();
+};
+
+document.addEventListener("click", unlockFromGesture, { capture: true });
+document.addEventListener("pointerdown", unlockFromGesture, { capture: true, passive: true });
+window.addEventListener("pageshow", () => unlockAudio());
+document.addEventListener("keydown", unlockFromGesture, { capture: true });
+document.addEventListener("touchstart", unlockFromGesture, { capture: true, passive: true });
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) unlockAudio();
+});
