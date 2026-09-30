@@ -7,6 +7,7 @@ const defaults = {
   messageSent: true,
   messageReceived: true,
   incomingCall: true,
+  callRinging: true,
   callConnected: true,
   status: true
 };
@@ -106,6 +107,7 @@ export function playSound(name) {
       messageSent: [[620, .09, 0], [820, .1, .07]],
       messageReceived: [[520, .11, 0], [690, .14, .08]],
       incomingCall: [[740, .2, 0], [920, .2, .23], [740, .2, .46]],
+      callRinging: [[520, .18, 0], [700, .2, .22]],
       callConnected: [[540, .1, 0], [720, .12, .1]],
       status: [[460, .1, 0], [610, .12, .1]]
     },
@@ -113,6 +115,7 @@ export function playSound(name) {
       messageSent: [[520, .12, 0], [660, .14, .09]],
       messageReceived: [[440, .13, 0], [560, .16, .1]],
       incomingCall: [[520, .18, 0], [660, .2, .2], [780, .22, .42]],
+      callRinging: [[420, .18, 0], [560, .2, .22]],
       callConnected: [[420, .13, 0], [560, .15, .12]],
       status: [[390, .13, 0], [500, .15, .11]]
     },
@@ -120,6 +123,7 @@ export function playSound(name) {
       messageSent: [[700, .07, 0], [980, .08, .06]],
       messageReceived: [[620, .08, 0], [860, .1, .07]],
       incomingCall: [[820, .12, 0], [1040, .13, .15], [820, .12, .3], [1040, .13, .45]],
+      callRinging: [[700, .1, 0], [920, .12, .15]],
       callConnected: [[660, .08, 0], [900, .1, .08]],
       status: [[560, .08, 0], [760, .1, .07]]
     },
@@ -127,6 +131,7 @@ export function playSound(name) {
       messageSent: [[480, .06, 0], [760, .08, .07]],
       messageReceived: [[400, .08, 0], [640, .09, .08]],
       incomingCall: [[620, .1, 0], [820, .1, .14], [1020, .12, .28]],
+      callRinging: [[500, .09, 0], [720, .1, .14]],
       callConnected: [[500, .07, 0], [800, .09, .08]],
       status: [[430, .07, 0], [700, .09, .08]]
     },
@@ -134,6 +139,7 @@ export function playSound(name) {
       messageSent: [[440, .07, 0], [660, .07, .08], [880, .08, .16]],
       messageReceived: [[330, .08, 0], [520, .08, .09]],
       incomingCall: [[660, .12, 0], [880, .12, .15], [660, .12, .3], [880, .12, .45]],
+      callRinging: [[440, .12, 0], [660, .12, .16], [880, .12, .32]],
       callConnected: [[330, .08, 0], [520, .09, .09], [780, .1, .19]],
       status: [[380, .08, 0], [570, .09, .09]]
     }
@@ -167,6 +173,8 @@ const unlockFromGesture = () => {
 };
 
 document.addEventListener("click", unlockFromGesture, { capture: true });
+document.addEventListener("pointerdown", unlockFromGesture, { capture: true, passive: true });
+window.addEventListener("pageshow", () => unlockAudio());
 document.addEventListener("keydown", unlockFromGesture, { capture: true });
 document.addEventListener("touchstart", unlockFromGesture, { capture: true, passive: true });
 document.addEventListener("visibilitychange", () => {
