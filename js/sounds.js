@@ -21,7 +21,9 @@ let pendingSounds = [];
 let customRingtoneUrl = null;
 let customRingtoneBuffer = null;
 let customRingtoneName = "";
-let customRingtoneType = "";\nlet customRingtoneAudio = null;\nlet customRingtoneOscillators = [];
+let customRingtoneType = "";
+let customRingtoneAudio = null;
+let customRingtoneOscillators = [];
 
 const RINGTONE_DB = "missapp-ringtones";
 const RINGTONE_STORE = "files";
@@ -94,7 +96,8 @@ export async function clearCustomRingtone() {
   } catch (error) {
     console.warn("MissApp custom ringtone clear failed:", error);
   }
-  stopCustomRingtone();\n  if (customRingtoneUrl) URL.revokeObjectURL(customRingtoneUrl);
+  stopCustomRingtone();
+  if (customRingtoneUrl) URL.revokeObjectURL(customRingtoneUrl);
   customRingtoneUrl = null;
   customRingtoneBuffer = null;
   customRingtoneName = "";
@@ -103,7 +106,20 @@ export async function clearCustomRingtone() {
   persist();
 }
 
-export function stopCustomRingtone() {\n  if (customRingtoneAudio) {\n    customRingtoneAudio.pause();\n    customRingtoneAudio.currentTime = 0;\n    customRingtoneAudio.src = "";\n    customRingtoneAudio = null;\n  }\n  customRingtoneOscillators.forEach(({ osc }) => {\n    try { osc.stop(); } catch {}\n  });\n  customRingtoneOscillators = [];\n}\n\nfunction playMp3Ringtone() {
+export function stopCustomRingtone() {
+  if (customRingtoneAudio) {
+    customRingtoneAudio.pause();
+    customRingtoneAudio.currentTime = 0;
+    customRingtoneAudio.src = "";
+    customRingtoneAudio = null;
+  }
+  customRingtoneOscillators.forEach(({ osc }) => {
+    try { osc.stop(); } catch {}
+  });
+  customRingtoneOscillators = [];
+}
+
+function playMp3Ringtone() {
   if (!customRingtoneBuffer) return false;
   if (customRingtoneUrl) URL.revokeObjectURL(customRingtoneUrl);
   const blob = new Blob([customRingtoneBuffer], { type: "audio/mpeg" });
@@ -324,7 +340,16 @@ export function playSound(name) {
   return true;
 }
 
-export async function previewCustomRingtone() {\n  await loadCustomRingtone();\n  if (!customRingtoneBuffer) return false;\n  await resumeAudio();\n  if (customRingtoneType === "mp3") return playMp3Ringtone();\n  if (customRingtoneType === "midi") return playMidiRingtone();\n  return false;\n}\n\nexport function getSoundSettings() {
+export async function previewCustomRingtone() {
+  await loadCustomRingtone();
+  if (!customRingtoneBuffer) return false;
+  await resumeAudio();
+  if (customRingtoneType === "mp3") return playMp3Ringtone();
+  if (customRingtoneType === "midi") return playMidiRingtone();
+  return false;
+}
+
+export function getSoundSettings() {
   return { ...settings };
 }
 
