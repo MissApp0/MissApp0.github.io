@@ -303,3 +303,16 @@
   .settings-range { width: 92px; }
   .settings-select { max-width: 110px; }
 }
+
+.settings-feature-row { align-items:flex-start; }
+.settings-value { margin-top:7px; color:#087f66; font-size:12px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.settings-inline-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.settings-file-button { min-height:38px; display:inline-flex; align-items:center; justify-content:center; padding:0 13px; border:1px solid #dbe4e7; border-radius:10px; background:#eef6f4; color:#087f66; font-size:12px; font-weight:700; cursor:pointer; }
+.settings-file-button:hover { background:#e2f1ed; }
+.settings-reset:disabled { opacity:.45; cursor:not-allowed; }
+.settings-panel-title { font-size:20px; font-weight:800; color:#111b21; }
+.settings-panel-description { max-width:680px; margin-top:6px; color:#52636a; font-size:14px; line-height:1.55; }
+.settings-label { font-size:15px; font-weight:700; color:#18272d; }
+.settings-description { margin-top:4px; color:#53666d; font-size:13px; line-height:1.5; }
+.settings-row { min-height:70px; }
+@media (max-width:680px) { .settings-feature-row { flex-wrap:wrap; } .settings-inline-actions { width:100%; padding-left:52px; } }
