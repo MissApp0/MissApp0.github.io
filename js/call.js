@@ -60,7 +60,58 @@ const OFFER_WAIT_DELAY_MS = 500;
 let activeCall = null;
 let incomingUnsubscribe = null;
 let callTimeout = null;
+let ringingTimer = null;
 
+function startOutgoingRinging() {
+  stopOutgoingRinging();
+  playSound("callRinging");
+  ringingTimer = setInterval(() => playSound("callRinging"), 2500);
+}
+function stopOutgoingRinging() {
+  if (ringingTimer) clearInterval(ringingTimer);
+  ringingTimer = null;
+}
+async function replaceVideoTrack(call, newTrack) {
+  const sender = call?.peer?.getSenders().find(item => item.track?.kind === "video");
+  if (!sender || !newTrack) return false;
+  const old = call.stream.getVideoTracks()[0];
+  await sender.replaceTrack(newTrack);
+  if (old && old !== newTrack) old.stop();
+  if (old) call.stream.removeTrack(old);
+  call.stream.addTrack(newTrack);
+  const local = document.getElementById("local-video");
+  if (local) local.srcObject = call.stream;
+  return true;
+}
+async function switchCamera() {
+  const call = activeCall;
+  if (!call?.stream?.getVideoTracks().length) return;
+  const cameras = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
+  if (cameras.length < 2) { setCallStatus("Only one camera is available."); return; }
+  const current = call.stream.getVideoTracks()[0].getSettings?.().deviceId;
+  const next = cameras.find(d => d.deviceId !== current) || cameras[0];
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { deviceId: { exact: next.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } });
+  await replaceVideoTrack(call, stream.getVideoTracks()[0]);
+}
+async function toggleScreenShare() {
+  const call = activeCall;
+  if (!call?.peer || !navigator.mediaDevices?.getDisplayMedia) { setCallStatus("Screen sharing is not supported in this browser."); return; }
+  const sender = call.peer.getSenders().find(item => item.track?.kind === "video");
+  if (!sender) { setCallStatus("Screen sharing requires a video call."); return; }
+  if (call.screenTrack) {
+    const camera = call.cameraTrack;
+    if (camera) await sender.replaceTrack(camera);
+    call.screenTrack.stop();
+    call.screenTrack = null;
+    return;
+  }
+  const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+  const screenTrack = display.getVideoTracks()[0];
+  call.cameraTrack = call.stream.getVideoTracks()[0];
+  call.screenTrack = screenTrack;
+  await sender.replaceTrack(screenTrack);
+  screenTrack.onended = () => { if (activeCall?.id === call.id) toggleScreenShare().catch(() => {}); };
+}
 function clearCallTimeout() {
   if (callTimeout) {
     clearTimeout(callTimeout);
@@ -108,6 +159,7 @@ function attachPeerMonitoring(peer, call) {
 
     if (peer.connectionState === "connected") {
       clearCallTimeout();
+      stopOutgoingRinging();
       playSound("callConnected");
       setCallStatus("Connected");
       logSelectedIceRoute(peer);
@@ -322,6 +374,7 @@ export async function startCall({ calleeId, calleeName, video = false }) {
   listenForCalleeCandidates(callRef.id, peer);
 
   showCallScreen(activeCall);
+  startOutgoingRinging();
   armCallTimeout(call.id);
   return activeCall;
 }
@@ -493,6 +546,7 @@ export async function endActiveCall(notify = true) {
 
   activeCall = null;
   clearCallTimeout();
+  stopOutgoingRinging();
 
   if (notify) {
     try {
@@ -588,7 +642,7 @@ function showCallScreen(call) {
     <video id="local-video" class="local-video" autoplay muted playsinline></video>
     <div class="call-controls">
       <button id="toggle-mic" class="call-control" title="Mute microphone">🎙</button>
-      ${call.type === "video" ? '<button id="toggle-camera" class="call-control" title="Camera">📹</button>' : ""}
+      ${call.type === "video" ? '<button id="toggle-camera" class="call-control" title="Camera">📹</button><button id="switch-camera" class="call-control" title="Switch camera">🔄</button><button id="share-screen" class="call-control" title="Share screen">🖥</button>' : ""}
       <button id="end-call" class="call-control end" title="End call">☎</button>
     </div>
   `;
@@ -609,6 +663,12 @@ function showCallScreen(call) {
     event.currentTarget.classList.toggle("off", !track.enabled);
   });
 
+  screen.querySelector("#switch-camera")?.addEventListener("click", async () => {
+    try { await switchCamera(); } catch (error) { console.error("Switch camera error:", error); setCallStatus("Could not switch camera."); }
+  });
+  screen.querySelector("#share-screen")?.addEventListener("click", async () => {
+    try { await toggleScreenShare(); } catch (error) { console.error("Screen share error:", error); setCallStatus("Could not share your screen."); }
+  });
   screen.querySelector("#toggle-camera")?.addEventListener("click", event => {
     const track = call.stream.getVideoTracks()[0];
     if (!track) return;
