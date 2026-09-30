@@ -297,8 +297,15 @@ function createAppUI() {
         <div class="chat-options-wrap">
           <button id="chat-options-button" class="chat-options-button" type="button" aria-label="Chat options" aria-expanded="false" title="Chat options">⋮</button>
           <div id="chat-options-menu" class="chat-options-menu hidden" role="menu">
-            <button id="rename-chat-button" type="button" role="menuitem">Rename chat</button>
-            <button id="leave-chat-button" type="button" role="menuitem" class="danger">Leave chat</button>
+            <button id="search-chat-button" type="button" role="menuitem">🔎 Search in chat</button>
+            <button id="chat-info-button" type="button" role="menuitem">ℹ️ Chat info</button>
+            <button id="pin-chat-button" type="button" role="menuitem">📌 Pin chat</button>
+            <button id="mute-chat-button" type="button" role="menuitem">🔕 Mute notifications</button>
+            <button id="mark-unread-button" type="button" role="menuitem">✉️ Mark as unread</button>
+            <button id="export-chat-button" type="button" role="menuitem">📥 Export chat</button>
+            <button id="rename-chat-button" type="button" role="menuitem">✏️ Rename chat</button>
+            <button id="archive-chat-button" type="button" role="menuitem">🗄️ Archive chat</button>
+            <button id="leave-chat-button" type="button" role="menuitem" class="danger">🚪 Leave chat</button>
           </div>
         </div>
       </div>
@@ -345,7 +352,14 @@ function setupEvents() {
   document.getElementById("voice-call-button")?.addEventListener("click", () => beginCall(false));
   document.getElementById("video-call-button")?.addEventListener("click", () => beginCall(true));
   document.getElementById("chat-options-button")?.addEventListener("click", toggleChatOptions);
+  document.getElementById("search-chat-button")?.addEventListener("click", searchCurrentChat);
+  document.getElementById("chat-info-button")?.addEventListener("click", showChatInfo);
+  document.getElementById("pin-chat-button")?.addEventListener("click", togglePinChat);
+  document.getElementById("mute-chat-button")?.addEventListener("click", toggleMuteChat);
+  document.getElementById("mark-unread-button")?.addEventListener("click", markCurrentChatUnread);
+  document.getElementById("export-chat-button")?.addEventListener("click", exportCurrentChat);
   document.getElementById("rename-chat-button")?.addEventListener("click", renameCurrentChat);
+  document.getElementById("archive-chat-button")?.addEventListener("click", archiveCurrentChat);
   document.getElementById("leave-chat-button")?.addEventListener("click", leaveCurrentChat);
 
   const composer = document.getElementById("composer-form");
@@ -1367,6 +1381,90 @@ function toggleChatOptions() {
 function closeChatOptions() {
   document.getElementById("chat-options-menu")?.classList.add("hidden");
   document.getElementById("chat-options-button")?.setAttribute("aria-expanded", "false");
+}
+
+
+function chatLocalKey(prefix) {
+  return `missapp-${prefix}-${state.user?.uid || "guest"}-${state.currentConversation?.id || ""}`;
+}
+
+function searchCurrentChat() {
+  closeChatOptions();
+  const term = window.prompt("Search this chat:");
+  if (!term?.trim()) return;
+  const needle = term.trim().toLowerCase();
+  const matches = [...document.querySelectorAll("#messages .message-text")]
+    .filter(el => el.textContent.toLowerCase().includes(needle));
+  matches.forEach(el => el.scrollIntoView({ behavior: "smooth", block: "center" }));
+  showToast(matches.length ? `${matches.length} matching message${matches.length === 1 ? "" : "s"} found.` : "No matching messages found.", matches.length ? "success" : "info");
+}
+
+function showChatInfo() {
+  const conversation = state.currentConversation;
+  closeChatOptions();
+  if (!conversation) return;
+  const count = conversation.participants?.length || 0;
+  const name = conversation.isGroup ? (conversation.name || "Group") : (conversation.otherUser?.displayName || conversation.otherUser?.username || conversation.otherUser?.email || "User");
+  window.alert(`${name}\n\n${conversation.isGroup ? `Group chat • ${count} participants` : "Private chat"}`);
+}
+
+function togglePinChat() {
+  const conversation = state.currentConversation;
+  if (!conversation) return;
+  const key = chatLocalKey("pinned");
+  const pinned = localStorage.getItem(key) === "1";
+  localStorage.setItem(key, pinned ? "0" : "1");
+  closeChatOptions();
+  showToast(pinned ? "Chat unpinned." : "Chat pinned.", "success");
+}
+
+function toggleMuteChat() {
+  const conversation = state.currentConversation;
+  if (!conversation) return;
+  const key = chatLocalKey("muted");
+  const muted = localStorage.getItem(key) === "1";
+  localStorage.setItem(key, muted ? "0" : "1");
+  closeChatOptions();
+  showToast(muted ? "Notifications unmuted." : "Notifications muted.", "success");
+}
+
+function markCurrentChatUnread() {
+  const conversation = state.currentConversation;
+  if (!conversation) return;
+  localStorage.setItem(chatLocalKey("unread"), "1");
+  closeChatOptions();
+  showToast("Chat marked as unread.", "success");
+}
+
+function exportCurrentChat() {
+  const conversation = state.currentConversation;
+  if (!conversation) return;
+  closeChatOptions();
+  const lines = [...document.querySelectorAll("#messages .message-row")].map(row => row.innerText.trim()).filter(Boolean);
+  const name = (conversation.name || conversation.otherUser?.displayName || conversation.otherUser?.username || "chat").replace(/[^a-z0-9_-]+/gi, "-");
+  const blob = new Blob([lines.join("\n\n")], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${name || "chat"}-missapp.txt`;
+  link.click();
+  URL.revokeObjectURL(url);
+  showToast("Chat exported.", "success");
+}
+
+function archiveCurrentChat() {
+  const conversation = state.currentConversation;
+  if (!conversation) return;
+  localStorage.setItem(chatLocalKey("archived"), "1");
+  closeChatOptions();
+  document.querySelector(`[data-conversation-id="${CSS.escape(conversation.id)}"`)?.remove();
+  document.body.classList.remove("chat-open");
+  currentConversationId = null;
+  state.currentConversation = null;
+  unsubscribeMessages?.();
+  unsubscribeMessages = null;
+  disableComposer();
+  showToast("Chat archived on this device.", "success");
 }
 
 async function renameCurrentChat() {
