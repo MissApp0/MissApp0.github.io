@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissApp</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/auth.css">
+  <link rel="stylesheet" href="css/chat.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <link rel="stylesheet" href="css/status.css">
+  <link rel="stylesheet" href="css/settings.css">
+  <link rel="stylesheet" href="css/themes.css">
+  <!-- Load your entry-point module -->
+  <script type="module" src="js/app.js" defer></script>
+</head>
+<body>
+
+  <!-- Toast notification container -->
+  <div id="toast-container"></div>
+
+  <!-- Auth screen container -->
+  <div id="auth"></div>
+
+  <!-- Main app interface container -->
+  <div id="app" class="hidden">
+    <aside id="sidebar" class="sidebar"></aside>
+    <main id="chat" class="chat"></main>
+  </div>
+
+</body>
+</html>
