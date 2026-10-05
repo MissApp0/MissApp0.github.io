@@ -415,6 +415,8 @@ Always deploy and verify the rules in the actual Firebase project. The GitHub co
 
 Add your preferred license before distributing MissApp publicly.
 
+Made with heart <3
+
 ---
 
 ## 💙 MissApp
