@@ -171,11 +171,11 @@ button:active {
 }
 
 .toast {
-  border: 1px solid rgba(255,255,255,.55);
+  border: 1px solid var(--border);
   border-radius: 14px;
-  background: rgba(25, 39, 46, .94);
-  box-shadow: 0 14px 35px rgba(0,0,0,.18);
-  color: #fff;
+  background: var(--panel);
+  box-shadow: 0 14px 35px rgba(0, 0, 0, .18);
+  color: var(--text);
 }
 
 
