@@ -81,7 +81,7 @@ jobs:
 
           for (const file of jsFiles) {
             const source = fs.readFileSync(file, 'utf8');
-            const imports = source.matchAll(/(?:from\\s*|import\\s*)['"]((?:\\.\\.?\\/)[^'"]+)['"]/g);
+            const imports = source.matchAll(/(?:from\s*|import\s*)['"]((?:\.\.\/|\.\/)[^'"]+)['"]/g);
             for (const match of imports) {
               const specifier = match[1];
               const target = path.resolve(path.dirname(file), specifier);
