@@ -232,7 +232,7 @@ function createAppUI() {
   sidebar.innerHTML = `
     <div class="sidebar-header">
       <div class="sidebar-top">
-        <div class="sidebar-title">WhatsApp</div>
+        <div class="sidebar-title">MissApp</div>
 
         <button id="close-sidebar" class="mobile-sidebar-button" type="button" aria-label="Close conversations">
           ×
