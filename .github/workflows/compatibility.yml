@@ -40,7 +40,8 @@ jobs:
             fi
           done < <(find css js -type f \( -name '*.css' -o -name '*.js' \) -print0)
 
-          for source_file in index.html manifest.webmanifest icon.svg firebase-messaging-sw.js; do
+          # index.html intentionally differs: root is the modular app; public/index.html preserves the legacy single-file app.
+          for source_file in manifest.webmanifest icon.svg firebase-messaging-sw.js; do
             if [[ ! -f "public/$source_file" ]]; then
               echo "::error::Missing Firebase Hosting copy: public/$source_file"
               exit 1
